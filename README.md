@@ -30,6 +30,7 @@ The plugin is available for both **Chrome** and **Firefox**.
 2. Visit any of the following Moodle webpages:
    - Moodle Dashboard/Course Overview (URL ending on /my)
    - Any Moodle course page (URL includes /course)
+   - Course activity pages (e.g. URL includes /mod/assign)
    - Moodle video page (URL includes /videoservice)
 3. Click the Moodle Buddy icon in the extension bar of your browser
 4. Explore all the features Moodle Buddy has to offer
