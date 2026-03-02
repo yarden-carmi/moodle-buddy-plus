@@ -361,6 +361,16 @@ class Course {
       return
     }
 
+    // Deduplicate resources before saving, as injected tile fragments might be matched 
+    // multiple times across different fallback queries (e.g file vs pluginfile nodes)
+    const uniqueResourcesMap = new Map<string, Resource>()
+    for (const res of this.resources) {
+      if (!uniqueResourcesMap.has(res.href)) {
+        uniqueResourcesMap.set(res.href, res)
+      }
+    }
+    this.resources = Array.from(uniqueResourcesMap.values())
+
     if (this.lastModifiedHeaders === undefined) {
       this.lastModifiedHeaders = Object.fromEntries(
         this.resources.map((r) => [r.href, r.lastModified])
@@ -503,6 +513,11 @@ class Course {
         const content = await this.fetchTileContent(sectionId, sesskey, contextId)
         if (content) {
           const wrapper = this.HTMLDocument.createElement("div")
+          wrapper.id = `section-${sectionId}`
+          const tileContainer = tile.closest(".tile") || tile
+          const titleElement = tileContainer.querySelector("h3")
+          const title = titleElement?.textContent?.trim() || tile.textContent?.trim() || `Section ${sectionId}`
+          wrapper.setAttribute("aria-label", title)
           wrapper.innerHTML = content
           hiddenContainer.appendChild(wrapper)
         }
