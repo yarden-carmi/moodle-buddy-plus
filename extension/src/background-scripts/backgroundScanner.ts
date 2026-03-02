@@ -41,7 +41,9 @@ async function backgroundScan() {
         command: COMMANDS.BG_COURSE_SCAN,
         href: courseLink,
         html: resBody,
-      } satisfies BackgroundCourseScanMessage)
+      } satisfies BackgroundCourseScanMessage).catch(() => {
+        // Ignore errors when tab is not a Moodle page or content script is not injected
+      })
     }
   }
 
