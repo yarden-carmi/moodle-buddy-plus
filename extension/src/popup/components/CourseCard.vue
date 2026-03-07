@@ -154,6 +154,7 @@ watch(() => props.downloadState, () => {
 
 const getResourceLabel = (resource: Resource): string => {
   if (isFile(resource)) return "File"
+  if (resource.type === "assignment") return "Assignment"
   if (isFolder(resource)) return "Folder"
   if (isActivity(resource)) return "Activity"
 
