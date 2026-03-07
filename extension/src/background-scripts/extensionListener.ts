@@ -182,5 +182,7 @@ chrome.runtime.onMessage.addListener(
 chrome.tabs.onHighlighted.addListener(async (tab) => {
   await sendTabMessageSafely(tab.tabIds[0], {
     command: COMMANDS.ENSURE_CORRECT_BADGE,
+  }).catch(() => {
+    // Ignore errors when tab is not a Moodle page or content script is not injected
   })
 })
