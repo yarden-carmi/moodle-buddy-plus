@@ -1,5 +1,5 @@
 export type ResourceTypes = FileResourceTypes | "folder" | "assignment" | "activity"
-export type FileResourceTypes = "file" | "pluginfile" | "url" | "videoservice"
+export type FileResourceTypes = "file" | "pluginfile" | "url" | "videoservice" | "zoom" | "sidebar-video" | "embedded-video"
 
 export interface Resource {
   href: string
@@ -22,6 +22,19 @@ export interface FileResource extends Resource {
 export interface VideoServiceResource extends Resource {
   type: "videoservice"
   src: string
+}
+
+export interface ZoomRecordingResource extends Resource {
+  type: "zoom"
+  zoomUrl: string
+}
+
+export interface SidebarVideoResource extends Resource {
+  type: "sidebar-video"
+}
+
+export interface EmbeddedVideoResource extends Resource {
+  type: "embedded-video"
 }
 
 export interface FolderResource extends Resource {

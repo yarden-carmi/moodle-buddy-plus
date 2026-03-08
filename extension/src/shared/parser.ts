@@ -124,56 +124,41 @@ export function parseCourseLink(htmlString: string): string {
   const match = htmlString.match(courseURLRegex)
   return match ? match[0] : htmlString
 }
+
+const ASSIGNMENT_NAME_SELECTORS = [
+  ".page-header-headings h1", "#page-header h1", ".page-context-header h1",
+  "#region-main h2", "#region-main h1", "h1",
+]
+
 export function parseAssignmentNameFromPage(document: Document): string {
-  const selectors = [
-    ".page-header-headings h1",
-    "#page-header h1",
-    ".page-context-header h1",
-    "#region-main h2",
-    "#region-main h1",
-    "h1",
-  ]
-
-  for (const selector of selectors) {
-    const node = document.querySelector(selector)
-    const textContent = node?.textContent?.replace(/\s+/g, " ")?.trim()
-    if (textContent) {
-      return textContent
-    }
+  for (const sel of ASSIGNMENT_NAME_SELECTORS) {
+    const text = document.querySelector(sel)?.textContent?.replace(/\s+/g, " ")?.trim()
+    if (text) return text
   }
-
   return ""
 }
 
 function getBreadcrumbItems(document: Document): HTMLElement[] {
   const breadcrumb = document.querySelector(".breadcrumb, nav[aria-label] ol, [role='navigation'] ol")
-  if (!breadcrumb) return []
-  return Array.from(breadcrumb.querySelectorAll("li"))
+  return breadcrumb ? Array.from(breadcrumb.querySelectorAll("li")) : []
 }
 
 function breadcrumbText(item: HTMLElement | undefined): string {
   return item?.textContent?.replace(/[\/]/g, "")?.replace(/\s+/g, " ")?.trim() || ""
 }
 
-function findCourseIndexInBreadcrumb(items: HTMLElement[]): number {
-  const courseURLRegex = getURLRegex("course")
-  return items.findIndex((item) => item.querySelector("a")?.href.match(courseURLRegex))
-}
-
 export function parseCourseNameFromBreadcrumb(document: Document): string {
   const items = getBreadcrumbItems(document)
-  const courseIndex = findCourseIndexInBreadcrumb(items)
-  if (courseIndex !== -1) return breadcrumbText(items[courseIndex])
-  return ""
+  const courseURLRegex = getURLRegex("course")
+  const idx = items.findIndex((item) => item.querySelector("a")?.href.match(courseURLRegex))
+  return idx !== -1 ? breadcrumbText(items[idx]) : ""
 }
 
 export function parseSectionFromBreadcrumb(document: Document): string {
   const items = getBreadcrumbItems(document)
-  const courseIndex = findCourseIndexInBreadcrumb(items)
-  // Section is the item immediately after the course and before the last item (current page)
-  if (courseIndex !== -1 && courseIndex < items.length - 2) {
-    return breadcrumbText(items[courseIndex + 1])
-  }
+  const courseURLRegex = getURLRegex("course")
+  const idx = items.findIndex((item) => item.querySelector("a")?.href.match(courseURLRegex))
+  if (idx !== -1 && idx < items.length - 2) return breadcrumbText(items[idx + 1])
   return ""
 }
 
@@ -440,13 +425,8 @@ export function parseSectionName(
   }
 
   // Tiles format section title
-  const tileTitle = section.querySelector("h3")
-  if (tileTitle) {
-    const textContent = tileTitle?.textContent?.trim()
-    if (textContent) {
-      return textContent
-    }
-  }
+  const tileText = section.querySelector("h3")?.textContent?.trim()
+  if (tileText) return tileText
 
   if (section.id === "section-0") {
     // Make an exception for section 0

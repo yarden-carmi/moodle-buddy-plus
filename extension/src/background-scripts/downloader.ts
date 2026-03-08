@@ -12,8 +12,11 @@ import {
   FolderResource,
   Resource,
   VideoServiceResource,
+  ZoomRecordingResource,
+  SidebarVideoResource,
+  EmbeddedVideoResource,
 } from "types"
-import { isDebug } from "@shared/helpers"
+import { isDebug, isFirefox } from "@shared/helpers"
 
 import {
   parseFileNameFromPluginFileURL,
@@ -30,6 +33,11 @@ import { COMMANDS } from "@shared/constants"
 
 let downloaders: Record<number, Downloader> = {}
 
+const ZOOM_PORT_NAME = "zoom-download"
+const ZOOM_RULE_ID_BASE = 900000
+const ZOOM_VIDEO_POLL_INTERVAL_MS = 1000
+const ZOOM_VIDEO_POLL_MAX_ATTEMPTS = 40
+
 const ASSIGNMENT_SELECTORS = {
   intro:
     "#intro, .box.generalbox.mod_introbox, .activity-description, [data-region='activity-description']",
@@ -40,12 +48,12 @@ const ASSIGNMENT_SELECTORS = {
     "[data-region='assign-feedback-status-table'], .feedbacktable, .assignfeedbacksummary, [data-region='assign-feedback-plugin-summary']",
 } as const
 
-function getTextContent(node: Element | null, selectorsToStrip: string[] = []): string {
+const NOISE_SELECTORS = "script,style,.hiddenifjs,[style*='display:none'],[style*='display: none'],button,noscript,select,input,textarea,form,label,[aria-hidden='true'],[role='img'],[role='button'],a[href='#']"
+
+function getTextContent(node: Element | null, extraStripSelectors: string[] = []): string {
   if (!node) return ""
   const clone = node.cloneNode(true) as Element
-  for (const sel of ["script", "style", ".hiddenifjs", ...selectorsToStrip]) {
-    clone.querySelectorAll(sel).forEach((el) => el.remove())
-  }
+  clone.querySelectorAll([NOISE_SELECTORS, ...extraStripSelectors].join(",")).forEach((el) => el.remove())
   const walk = (n: ChildNode): string => {
     if (n.nodeType === 3) return n.textContent ?? ""
     if (n.nodeType !== 1) return ""
@@ -59,24 +67,6 @@ function getTextContent(node: Element | null, selectorsToStrip: string[] = []): 
   return walk(clone).replace(/\n{2,}/g, "\n").trim()
 }
 
-const STRIP_FROM_TABLE_CELLS = [
-  // Hidden content (templates, collapsed sections)
-  "[style*='display:none']",
-  "[style*='display: none']",
-  // Interactive / decorative elements
-  "button",
-  "noscript",
-  "select",
-  "input",
-  "textarea",
-  "form",
-  "label",
-  "[aria-hidden='true']",
-  "[role='img']",
-  "[role='button']",
-  "a[href='#']",
-]
-
 function getTableRows(root: Element): string[] {
   const lines: string[] = []
   const seen = new Set<string>()
@@ -88,7 +78,7 @@ function getTableRows(root: Element): string[] {
     const value = cells
       .filter((c) => c !== labelCell)
       .map((c) =>
-        getTextContent(c as Element, STRIP_FROM_TABLE_CELLS)
+        getTextContent(c as Element)
           .replace(/\n/g, " ")
           .replace(/\s+/g, " ")
           .trim()
@@ -209,6 +199,19 @@ class Downloader {
     return this.createdAt === Math.max(...Object.values(downloaders).map((d) => d.createdAt))
   }
 
+  getProgressSnapshot(): DownloadProgressMessage {
+    return {
+      command: COMMANDS.DOWNLOAD_PROGRESS,
+      id: this.id,
+      courseLink: this.courseLink,
+      courseName: this.courseName,
+      completed: this.finished.length,
+      total: this.fileCount,
+      errors: this.errorCount,
+      isDone: this.isDone(),
+    }
+  }
+
   async onCompleted(id: number) {
     const downloadItem = await chrome.downloads.search({ id })
     this.byteCount += downloadItem[0].fileSize
@@ -261,6 +264,15 @@ class Downloader {
             break
           case "videoservice":
             await this.downloadVideoServiceVideo(r as VideoServiceResource)
+            break
+          case "zoom":
+            await this.downloadZoomRecording(r as ZoomRecordingResource)
+            break
+          case "sidebar-video":
+            await this.downloadPageVideo(r as SidebarVideoResource)
+            break
+          case "embedded-video":
+            await this.downloadPageVideo(r as EmbeddedVideoResource)
             break
           default:
             break
@@ -325,7 +337,7 @@ class Downloader {
   private async download(
     href: string,
     fileName: string,
-    resource: FileResource | FolderResource | AssignmentResource
+    resource: FileResource | FolderResource | AssignmentResource | ZoomRecordingResource | SidebarVideoResource | EmbeddedVideoResource
   ) {
     if (this.isCancelled) return
 
@@ -416,7 +428,14 @@ class Downloader {
 
       if (this.inProgress.size < this.options.maxConcurrentDownloads) {
         try {
-          const id = await chrome.downloads.download({ url: href, filename: filePath })
+          let downloadUrl = href
+          // Firefox doesn't support data: URLs in downloads.download()
+          if (isFirefox && href.startsWith("data:")) {
+            const res = await fetch(href)
+            const blob = await res.blob()
+            downloadUrl = URL.createObjectURL(blob)
+          }
+          const id = await chrome.downloads.download({ url: downloadUrl, filename: filePath })
           logger.debug(`Started download with id ${id} ${filePath}`)
           await this.onDownloadStart(id)
         } catch (err) {
@@ -595,6 +614,172 @@ class Downloader {
     await this.download(src, fileName, resource)
   }
 
+  private async downloadPageVideo(resource: SidebarVideoResource | EmbeddedVideoResource) {
+    if (this.isCancelled) return
+
+    const { name, href } = resource
+    let tab: chrome.tabs.Tab | undefined
+
+    try {
+      tab = await chrome.tabs.create({ url: href, active: false })
+      if (!tab.id) {
+        await this.onError()
+        return
+      }
+
+      const tabId = tab.id
+      const videoSrc = await this.pollForVideoSrc(tabId)
+      try { await chrome.tabs.remove(tabId) } catch { /* tab may already be closed */ }
+
+      if (!videoSrc) {
+        logger.error(`Failed to extract video URL for: ${name}`)
+        await this.onError()
+        return
+      }
+
+      const fileName = `${sanitizeFileName(name)}.mp4`
+      await this.download(videoSrc, fileName, resource)
+    } catch (err) {
+      logger.error("Error downloading video", err)
+      if (tab?.id) {
+        try { await chrome.tabs.remove(tab.id) } catch { /* tab may already be closed */ }
+      }
+      await this.onError()
+    }
+  }
+
+  private async pollForVideoSrc(tabId: number): Promise<string | null> {
+    let pageLoadedWithoutVideo = 0
+    for (let i = 0; i < ZOOM_VIDEO_POLL_MAX_ATTEMPTS; i++) {
+      if (this.isCancelled) return null
+      try {
+        const results = await chrome.scripting.executeScript({
+          target: { tabId },
+          func: () => {
+            const video = document.querySelector("video")
+            if (video?.src || video?.currentSrc) {
+              return { src: video.src || video.currentSrc, loaded: true }
+            }
+            const isLoaded = document.readyState === "complete"
+            return { src: null, loaded: isLoaded }
+          },
+        })
+        const result = results?.[0]?.result
+        if (result?.src) return result.src
+
+        // If the page is fully loaded but has no video, count consecutive checks
+        if (result?.loaded) {
+          pageLoadedWithoutVideo++
+          // If page loaded and 5 consecutive checks found no video, give up early
+          if (pageLoadedWithoutVideo >= 5) return null
+        } else {
+          pageLoadedWithoutVideo = 0
+        }
+      } catch { /* tab might not be ready yet */ }
+      await new Promise((r) => setTimeout(r, ZOOM_VIDEO_POLL_INTERVAL_MS))
+    }
+    return null
+  }
+
+  private async downloadZoomRecording(resource: ZoomRecordingResource) {
+    if (this.isCancelled) return
+
+    const { name, zoomUrl } = resource
+    let tab: chrome.tabs.Tab | undefined
+
+    try {
+      tab = await chrome.tabs.create({ url: zoomUrl, active: false })
+      if (!tab.id) {
+        await this.onError()
+        return
+      }
+
+      const tabId = tab.id
+      const videoSrc = await this.pollForVideoSrc(tabId)
+      try { await chrome.tabs.remove(tabId) } catch { /* tab may already be closed */ }
+
+      if (!videoSrc) {
+        logger.error(`Failed to extract video URL for Zoom recording: ${name}`)
+        await this.onError()
+        return
+      }
+
+      // declarativeNetRequest: set Referer and remove Origin so the CDN accepts the fetch
+      const cdnHost = new URL(videoSrc).hostname
+      const ruleId = ZOOM_RULE_ID_BASE + resource.resourceIndex
+      await chrome.declarativeNetRequest.updateDynamicRules({
+        addRules: [
+          {
+            id: ruleId,
+            priority: 1,
+            action: {
+              type: "modifyHeaders" as chrome.declarativeNetRequest.RuleActionType,
+              requestHeaders: [
+                { header: "Origin", operation: "remove" as chrome.declarativeNetRequest.HeaderOperation },
+                { header: "Referer", operation: "set" as chrome.declarativeNetRequest.HeaderOperation, value: new URL(zoomUrl).origin + "/" },
+              ],
+            },
+            condition: {
+              urlFilter: `||${cdnHost}`,
+              resourceTypes: ["xmlhttprequest" as chrome.declarativeNetRequest.ResourceType],
+            },
+          },
+        ],
+        removeRuleIds: [ruleId],
+      })
+
+      let blobResult: { blobUrl?: string; size?: number; error?: string }
+
+      if (isFirefox) {
+        // Firefox background scripts can fetch and create blob URLs directly
+        try {
+          const resp = await fetch(videoSrc)
+          if (!resp.ok) {
+            blobResult = { error: `HTTP ${resp.status} ${resp.statusText}` }
+          } else {
+            const blob = await resp.blob()
+            blobResult = { blobUrl: URL.createObjectURL(blob), size: blob.size }
+          }
+        } catch (e: any) {
+          blobResult = { error: String(e?.message || e) }
+        }
+      } else {
+        // Chrome service workers can't use URL.createObjectURL, use offscreen document
+        try {
+          await chrome.offscreen.createDocument({
+            url: chrome.runtime.getURL("pages/offscreen/offscreen.html"),
+            reasons: [chrome.offscreen.Reason.BLOBS],
+            justification: "Fetch Zoom recording and create blob URL for download",
+          })
+        } catch { /* document may already exist */ }
+
+        blobResult = await new Promise<{ blobUrl?: string; size?: number; error?: string }>((resolve) => {
+          const port = chrome.runtime.connect({ name: ZOOM_PORT_NAME })
+          port.onMessage.addListener((msg) => { resolve(msg); port.disconnect() })
+          port.postMessage({ type: "fetch-and-blob", url: videoSrc })
+        })
+      }
+
+      try {
+        await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [ruleId] })
+      } catch { /* best effort */ }
+
+      if (!blobResult || blobResult.error || !blobResult.blobUrl) {
+        logger.error(`Offscreen fetch failed for ${name}: ${blobResult?.error ?? "unknown error"}`)
+        await this.onError()
+        return
+      }
+
+      await this.download(blobResult.blobUrl, `${sanitizeFileName(name)}.mp4`, resource)
+    } catch (err) {
+      logger.error("Error downloading Zoom recording", err)
+      if (tab?.id) {
+        try { await chrome.tabs.remove(tab.id) } catch { /* tab may already be closed */ }
+      }
+      await this.onError()
+    }
+  }
+
   private async downloadAssignment(resource: AssignmentResource) {
     if (this.isCancelled) return
 
@@ -714,16 +899,28 @@ chrome.downloads.onChanged.addListener(async (downloadDelta) => {
   }
 })
 
-chrome.runtime.onMessage.addListener(async (message: Message) => {
+function getDownloadState(): DownloadProgressMessage | null {
+  const activeDownloaders = Object.values(downloaders)
+  if (activeDownloaders.length === 0) return null
+
+  // Return state of the most recent active downloader
+  const downloader = activeDownloaders.reduce((a, b) => (a.isMostRecent() ? a : b))
+  return downloader.getProgressSnapshot()
+}
+
+chrome.runtime.onMessage.addListener((message: Message, _sender, sendResponse) => {
   const { command } = message
   switch (command) {
     case COMMANDS.CANCEL_DOWNLOAD:
-      await onCancel()
-      break
+      onCancel().then(() => sendResponse())
+      return true
     case COMMANDS.DOWNLOAD:
-      await onDownload(message as DownloadMessage)
-      break
+      onDownload(message as DownloadMessage).then(() => sendResponse())
+      return true
+    case COMMANDS.GET_DOWNLOAD_STATE:
+      sendResponse(getDownloadState())
+      return false
     default:
-      break
+      return false
   }
 })

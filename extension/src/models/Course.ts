@@ -6,6 +6,9 @@ import {
   AssignmentResource,
   FileResource,
   FolderResource,
+  ZoomRecordingResource,
+  SidebarVideoResource,
+  EmbeddedVideoResource,
   CourseData,
 } from "types"
 import * as parser from "@shared/parser"
@@ -157,6 +160,10 @@ class Course {
   }
 
   private async addURLNode(node: HTMLElement) {
+    // First, check if this URL points to a Zoom recording
+    const addedAsZoom = await this.addZoomRecordingFromURLNode(node)
+    if (addedAsZoom) return
+
     // Make sure URL is a downloadable file
     const activityIcon: HTMLImageElement | null = node.querySelector("img.activityicon")
     if (activityIcon) {
@@ -187,6 +194,38 @@ class Course {
           this.addResource(resourceNode)
         }
       }
+    }
+  }
+
+  private static readonly ZOOM_RECORDING_REGEX = /https?:\/\/[^/]*zoom\.[^/]+\/rec\/(share|play)\//i
+
+  private async addZoomRecordingFromURLNode(node: HTMLElement): Promise<boolean> {
+    const href = parser.parseURLFromNode(node, "url", this.options)
+    if (href === "") return false
+
+    try {
+      const res = await fetch(href)
+      const doc = new DOMParser().parseFromString(await res.text(), "text/html")
+      const targetUrl = doc.querySelector<HTMLAnchorElement>(".urlworkaround a[href]")?.getAttribute("href") || ""
+      if (!Course.ZOOM_RECORDING_REGEX.test(targetUrl)) return false
+
+      const section = parser.parseSectionName(node, this.HTMLDocument, this.options)
+      const resource: ZoomRecordingResource = {
+        href,
+        name: parser.parseFileNameFromNode(node),
+        section,
+        type: "zoom",
+        zoomUrl: targetUrl,
+        isNew: false,
+        isUpdated: false,
+        resourceIndex: this.resources.length + 1,
+        sectionIndex: this.getSectionIndex(section),
+      }
+      this.addResource(resource)
+      return true
+    } catch (err) {
+      logger.error("Failed to check URL node for Zoom recording", err)
+      return false
     }
   }
 
@@ -243,13 +282,8 @@ class Course {
     this.addResource(resource)
   }
 
-  private async addAssignmentResource(
-    href: string,
-    name: string,
-    section: string,
-    sectionIndex: number
-  ) {
-    const resource: AssignmentResource = {
+  private async addAssignmentResource(href: string, name: string, section: string) {
+    this.addResource({
       href,
       name,
       section,
@@ -257,30 +291,82 @@ class Course {
       isNew: false,
       isUpdated: false,
       resourceIndex: this.resources.length + 1,
-      sectionIndex,
+      sectionIndex: this.getSectionIndex(section),
       lastModified: await getLastModifiedHeader(href, this.options),
-    }
-
-    this.addResource(resource)
+    } satisfies AssignmentResource)
   }
 
   private async addAssignment(node: HTMLElement) {
     const href = parser.parseURLFromNode(node, "activity", this.options)
     if (href === "") return
-
     const section = parser.parseSectionName(node, this.HTMLDocument, this.options)
-    const sectionIndex = this.getSectionIndex(section)
-    const name = parser.parseActivityNameFromNode(node)
-    await this.addAssignmentResource(href, name, section, sectionIndex)
+    await this.addAssignmentResource(href, parser.parseActivityNameFromNode(node), section)
   }
 
   private async addCurrentAssignmentPage() {
     const courseName = parser.parseCourseNameFromBreadcrumb(this.HTMLDocument)
     if (courseName) this.name = courseName
     const section = parser.parseSectionFromBreadcrumb(this.HTMLDocument)
+    await this.addAssignmentResource(this.link, parser.parseAssignmentNameFromPage(this.HTMLDocument), section)
+  }
+
+  private async addEmbeddedVideo(node: HTMLElement) {
+    const href = parser.parseURLFromNode(node, "activity", this.options)
+    if (href === "") return
+
+    const section = parser.parseSectionName(node, this.HTMLDocument, this.options)
     const sectionIndex = this.getSectionIndex(section)
-    const name = parser.parseAssignmentNameFromPage(this.HTMLDocument)
-    await this.addAssignmentResource(this.link, name, section, sectionIndex)
+    const resource: EmbeddedVideoResource = {
+      href,
+      name: parser.parseFileNameFromNode(node),
+      section,
+      type: "embedded-video",
+      isNew: false,
+      isUpdated: false,
+      resourceIndex: this.resources.length + 1,
+      sectionIndex,
+    }
+
+    this.addResource(resource)
+  }
+
+  private addSidebarVideos() {
+    const sidebarVideoLinks = this.HTMLDocument.querySelectorAll<HTMLAnchorElement>(
+      'a[href*="/blocks/video/viewvideo"]'
+    )
+
+    for (const link of Array.from(sidebarVideoLinks)) {
+      const href = link.href
+      if (!href) continue
+
+      // Avoid duplicates
+      if (this.resources.some((r) => r.href === href)) continue
+
+      // Get name from the nearest text link (some are just thumbnail links)
+      let name = link.textContent?.trim() || ""
+      if (!name) {
+        // This might be a thumbnail link; find the sibling text link
+        const parent = link.closest("[class]")?.parentElement
+        if (parent) {
+          const textLink = parent.querySelector<HTMLAnchorElement>('a[href*="/blocks/video/viewvideo"]:not(:has(img))')
+          name = textLink?.textContent?.trim() || ""
+        }
+      }
+      if (!name) continue
+
+      const resource: SidebarVideoResource = {
+        href,
+        name,
+        section: "Sidebar Videos",
+        type: "sidebar-video",
+        isNew: false,
+        isUpdated: false,
+        resourceIndex: this.resources.length + 1,
+        sectionIndex: this.getSectionIndex("Sidebar Videos"),
+      }
+
+      this.addResource(resource)
+    }
   }
 
   private async addActivity(node: HTMLElement) {
@@ -291,6 +377,11 @@ class Course {
     const activityType = parser.parseActivityTypeFromNode(node)
     if (activityType === "assign") {
       await this.addAssignment(node)
+      return
+    }
+
+    if (activityType === "videostream") {
+      await this.addEmbeddedVideo(node)
       return
     }
 
@@ -423,6 +514,9 @@ class Course {
       logger.debug("Course scan finished", { course: this })
     }
 
+    // Scan sidebar for video block links (outside #region-main)
+    this.addSidebarVideos()
+
     if (testLocalStorage) {
       return
     }
@@ -553,114 +647,71 @@ class Course {
       logger.warn("Could not find sesskey or contextid, falling back to visual clicks")
       for (const tile of Array.from(tiles)) {
         tile.click()
-        await this.sleep(500)
+        await new Promise((r) => setTimeout(r, 500))
       }
       return
     }
 
-    // Create a hidden container for the fetched content so scanner can find modules
     const hiddenContainer = this.HTMLDocument.createElement("div")
-    hiddenContainer.id = "moodle-buddy-tiles-content"
     hiddenContainer.style.display = "none"
     mainHTML.appendChild(hiddenContainer)
 
-    const fetchPromises = Array.from(tiles).map(async (tile) => {
-      const url = new URL((tile as HTMLAnchorElement).href)
-      const sectionId = url.searchParams.get("id")
+    await Promise.all(Array.from(tiles).map(async (tile) => {
+      const sectionId = new URL((tile as HTMLAnchorElement).href).searchParams.get("id")
       if (!sectionId) return
-
       try {
         const content = await this.fetchTileContent(sectionId, sesskey, contextId)
-        if (content) {
-          const wrapper = this.HTMLDocument.createElement("div")
-          wrapper.id = `section-${sectionId}`
-          const tileContainer = tile.closest(".tile") || tile
-          const titleElement = tileContainer.querySelector("h3")
-          const title = titleElement?.textContent?.trim() || tile.textContent?.trim() || `Section ${sectionId}`
-          wrapper.setAttribute("aria-label", title)
-          wrapper.innerHTML = content
-          hiddenContainer.appendChild(wrapper)
-        }
+        if (!content) return
+        const wrapper = this.HTMLDocument.createElement("div")
+        wrapper.id = `section-${sectionId}`
+        const title = (tile.closest(".tile") || tile).querySelector("h3")?.textContent?.trim() || `Section ${sectionId}`
+        wrapper.setAttribute("aria-label", title)
+        wrapper.innerHTML = content
+        hiddenContainer.appendChild(wrapper)
       } catch (e) {
         logger.error(`Failed to fetch tile content for section ${sectionId}`, e)
       }
-    })
+    }))
+  }
 
-    await Promise.all(fetchPromises)
-    logger.debug("All tiles fetched and injected into hidden container")
+  private getScriptContent(): string {
+    return Array.from(this.HTMLDocument.scripts).map((s) => s.textContent).join(" ")
   }
 
   private getSesskey(): string | undefined {
-    // Try to get from M.cfg or from a logout link
-    const scriptContent = Array.from(this.HTMLDocument.scripts)
-      .map((s) => s.textContent)
-      .join(" ")
-    const match = scriptContent.match(/"sesskey":"([^"]+)"/)
+    const match = this.getScriptContent().match(/"sesskey":"([^"]+)"/)
     if (match) return match[1]
-
     const logoutLink = this.HTMLDocument.querySelector<HTMLAnchorElement>('a[href*="login/logout.php?sesskey="]')
-    if (logoutLink) {
-      const url = new URL(logoutLink.href)
-      return url.searchParams.get("sesskey") ?? undefined
-    }
-
-    return undefined
+    return logoutLink ? new URL(logoutLink.href).searchParams.get("sesskey") ?? undefined : undefined
   }
 
   private getContextId(): string | undefined {
-    const scriptContent = Array.from(this.HTMLDocument.scripts)
-      .map((s) => s.textContent)
-      .join(" ")
-    const match = scriptContent.match(/"contextid":(\d+)/)
+    const match = this.getScriptContent().match(/"contextid":(\d+)/)
     if (match) return match[1]
-
-    // Fallback: look for body classes or other indicators
-    const bodyClass = this.HTMLDocument.body.className
-    const contextMatch = bodyClass.match(/context-(\d+)/)
-    if (contextMatch) return contextMatch[1]
-
-    return undefined
+    return this.HTMLDocument.body.className.match(/context-(\d+)/)?.[1]
   }
 
   private async fetchTileContent(sectionId: string, sesskey: string, contextId: string): Promise<string | undefined> {
     const baseURL = getMoodleBaseURL(this.link)
-    const url = `${baseURL}/lib/ajax/service.php?sesskey=${sesskey}&info=core_get_fragment`
-
-    const payload = [
-      {
+    const response = await fetch(`${baseURL}/lib/ajax/service.php?sesskey=${sesskey}&info=core_get_fragment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify([{
         index: 0,
         methodname: "core_get_fragment",
         args: {
           component: "format_tiles",
           callback: "get_cm_list",
           contextid: parseInt(contextId),
-          args: [
-            {
-              name: "sectionid",
-              value: parseInt(sectionId)
-            }
-          ]
-        }
-      }
-    ]
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
+          args: [{ name: "sectionid", value: parseInt(sectionId) }],
+        },
+      }]),
     })
-
     if (!response.ok) return undefined
-
     const data = await response.json()
     return data[0]?.data?.html
   }
 
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms))
-  }
 }
 
 export default Course

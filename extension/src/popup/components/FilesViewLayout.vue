@@ -176,13 +176,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUpdated, ref } from "vue"
+import { computed, nextTick, onMounted, onUpdated, ref } from "vue"
 import DetailOverlay from "./DetailOverlay.vue"
 import ProgressBar from "./ProgressBar.vue"
 import SelectionTab from "./SelectionTab.vue"
 import defaultExtensionOptions from "@shared/defaultExtensionOptions"
 import { sendEvent } from "@shared/helpers"
-import { isAssignment, isFile, isFolder, isVideoServiceVideo } from "@shared/resourceHelpers"
+import { isDownloadableResource } from "@shared/resourceHelpers"
 import {
   Activity,
   CourseCrawlMessage,
@@ -219,7 +219,7 @@ const prependFileIndexToFileName = ref(options.value?.prependFileIndexToFileName
 
 // Resource data
 const resources = computed(() =>
-  props.resources.filter((r) => isFile(r) || isFolder(r) || isAssignment(r) || isVideoServiceVideo(r))
+  props.resources.filter(isDownloadableResource)
 )
 const nResources = computed(() => resources.value.length)
 const selectedResources = computed(() => resources.value.filter((r) => r.selected))
@@ -343,16 +343,30 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
   if (command === COMMANDS.DOWNLOAD_PROGRESS) {
     const { completed, total, errors } = message as DownloadProgressMessage
     const progressBarRef = progressBar.value as any
-    progressBarRef.setProgress(total, completed, errors)
+    progressBarRef?.setProgress(total, completed, errors)
   }
 })
 
 // Lifecycle hooks
-onUpdated(() => {
-  if (downloadInProgress.value) {
+const restoredFromBackground = ref(false)
+
+onMounted(async () => {
+  const state = await chrome.runtime.sendMessage({
+    command: COMMANDS.GET_DOWNLOAD_STATE,
+  } satisfies Message) as DownloadProgressMessage | null
+  if (state && !state.isDone) {
+    downloadInProgress.value = true
+    restoredFromBackground.value = true
+    await nextTick()
     const progressBarRef = progressBar.value as any
-    // Set initial progress
-    progressBarRef.setProgress(selectedResources.value.length)
+    progressBarRef?.setProgress(state.total, state.completed, state.errors)
+  }
+})
+
+onUpdated(() => {
+  if (downloadInProgress.value && !restoredFromBackground.value) {
+    const progressBarRef = progressBar.value as any
+    progressBarRef?.setProgress(selectedResources.value.length)
   }
 })
 </script>
