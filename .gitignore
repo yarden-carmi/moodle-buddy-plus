@@ -12,6 +12,6 @@ test/**
 !test/index.js
 
 *.rest
-*.zip
+
 *.env*
 !.env.example
