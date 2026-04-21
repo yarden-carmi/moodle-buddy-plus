@@ -5,7 +5,7 @@ const BACKGROUND_SCRIPT = "background.js"
 const firefoxProperties = {
   browser_specific_settings: {
     gecko: {
-      id: "{29d2b673-83e5-4aca-a0b8-f9130b9b9cb7}",
+      id: "{d8623073-e6a7-441d-9140-c25813135e05}",
       data_collection_permissions: {
         required: ["none"],
       },
