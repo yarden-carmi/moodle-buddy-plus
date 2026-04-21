@@ -1,4 +1,6 @@
+website/
 node_modules
+extension/ff-profile
 .cache
 build
 text
@@ -15,3 +17,6 @@ test/**
 
 *.env*
 !.env.example
+website/*
+.claude/settings.local.json
+logo.psd

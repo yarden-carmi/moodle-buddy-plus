@@ -3,4 +3,7 @@ import { isDev } from "./helpers"
 
 export default pino({
   level: isDev ? "debug" : "info",
+  browser: {
+    asObject: false,
+  },
 })

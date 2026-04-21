@@ -39,12 +39,9 @@ addExtensionEntry("content-scripts/videoservicePage.ts")
 // addExtensionEntry("background-scripts/backgroundScanner.ts")
 addExtensionEntry("background-scripts/index.ts", "background")
 
-addExtensionEntry("pages/contact/contact.ts")
 addExtensionEntry("pages/information/information.ts")
 addExtensionEntry("pages/install/install.ts")
-// addExtensionEntry("pages/legal/legal.ts")
 addExtensionEntry("pages/options/options.ts")
-addExtensionEntry("pages/update/update.ts")
 
 module.exports = {
   entry: entries,

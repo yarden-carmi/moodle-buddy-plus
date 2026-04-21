@@ -77,13 +77,13 @@
           </div>
           <div class="grid grid-cols-2 mt-1 gap-x-3">
             <div
-              class="underline text-gray-600 hover:cursor-pointer hover:text-mb-red"
+              class="underline text-gray-600 hover:cursor-pointer hover:text-mb-blue"
               @click="toggleDetails(true)"
             >
               Show details
             </div>
             <div
-              class="underline text-gray-600 hover:cursor-pointer hover:text-mb-red"
+              class="underline text-gray-600 hover:cursor-pointer hover:text-mb-blue"
               @click="onMarkAsSeenClick"
             >
               Mark as seen
@@ -99,7 +99,7 @@
             <slot name="simple-selection"></slot>
 
             <button
-              class="mt-2 text-sm text-gray-600 underline hover:cursor-pointer hover:text-mb-red disabled:text-gray-300 disabled:cursor-default"
+              class="mt-2 text-sm text-gray-600 underline hover:cursor-pointer hover:text-mb-blue disabled:text-gray-300 disabled:cursor-default"
               :disabled="disableDownload"
               @click="toggleDetails(false)"
             >
@@ -181,7 +181,6 @@ import DetailOverlay from "./DetailOverlay.vue"
 import ProgressBar from "./ProgressBar.vue"
 import SelectionTab from "./SelectionTab.vue"
 import defaultExtensionOptions from "@shared/defaultExtensionOptions"
-import { sendEvent } from "@shared/helpers"
 import { isDownloadableResource } from "@shared/resourceHelpers"
 import {
   Activity,
@@ -274,7 +273,6 @@ const toggleDetails = (onlyNew = false) => {
   showDetails.value = !showDetails.value
 
   if (showDetails.value) {
-    sendEvent("show-details-course-page", true)
   }
 }
 
@@ -291,7 +289,6 @@ const onDownloadCancel = () => {
     command: COMMANDS.CANCEL_DOWNLOAD,
   } satisfies Message)
   downloadInProgress.value = false
-  sendEvent(COMMANDS.CANCEL_DOWNLOAD, true)
 }
 
 const disableDownload = computed(() => {
@@ -377,6 +374,6 @@ onUpdated(() => {
 }
 
 .active-tab {
-  @apply border-mb-red text-black;
+  @apply border-mb-blue text-black;
 }
 </style>

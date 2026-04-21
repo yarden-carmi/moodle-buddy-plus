@@ -1,28 +1,13 @@
 <p style="display: flex; flex-direction: column; align-items: center;">
-   <a href="https://moodlebuddy.com">
-      <img src="website/assets/images/mb.png">
-   </a>
-   <h2 align="center">MoodleBuddy</h2>
+   <h2 align="center">Moodle Buddy+</h2>
    <p style="width: 600px; margin: auto; text-align: center;">
-      Moodle Buddy offers mass file download and notification functionality for the Moodle learning management platform. Students can download all learning materials with just one click and see updates to their courses immediately.
+      Moodle Buddy+ offers mass file download and notification functionality for the Moodle learning management platform. Students can download all learning materials with just one click and see updates to their courses immediately.
    </p>
 </p>
 
 ## Installation
 
 The plugin is available for both **Chrome** and **Firefox**.
-
-<a href="https://chrome.google.com/webstore/detail/moodle-buddy/nomahjpllnbcpbggnpiehiecfbjmcaeo"><img src="https://user-images.githubusercontent.com/585534/107280622-91a8ea80-6a26-11eb-8d07-77c548b28665.png" alt="Get Moodle Buddy for Chromium"></a>
-
-![Version](https://img.shields.io/chrome-web-store/v/nomahjpllnbcpbggnpiehiecfbjmcaeo)
-![Users](https://img.shields.io/chrome-web-store/users/nomahjpllnbcpbggnpiehiecfbjmcaeo)
-![Ratings](https://img.shields.io/chrome-web-store/rating/nomahjpllnbcpbggnpiehiecfbjmcaeo)
-
-<a href="https://addons.mozilla.org/addon/moodle-buddy/"><img src="https://user-images.githubusercontent.com/585534/107280546-7b9b2a00-6a26-11eb-8f9f-f95932f4bfec.png" alt="Get Moodle Buddy for Firefox"></a>
-
-![Version](https://img.shields.io/amo/v/moodle-buddy)
-![Users](https://img.shields.io/amo/users/moodle-buddy)
-![Ratings](https://img.shields.io/amo/rating/moodle-buddy)
 
 ## Usage
 
@@ -32,8 +17,8 @@ The plugin is available for both **Chrome** and **Firefox**.
    - Any Moodle course page (URL includes /course)
    - Course activity pages (e.g. URL includes /mod/assign)
    - Moodle video page (URL includes /videoservice)
-3. Click the Moodle Buddy icon in the extension bar of your browser
-4. Explore all the features Moodle Buddy has to offer
+3. Click the Moodle Buddy+ icon in the extension bar of your browser
+4. Explore all the features Moodle Buddy+ has to offer
 
 ## Full Feature List
 
@@ -52,6 +37,18 @@ The plugin is available for both **Chrome** and **Firefox**.
 - Shows updates (resources & activities) for all courses from the dashboard page
 - Download new resources directly from the dashboard page
 - Scans your courses in the background (if you are logged in) and notifies you if there are updates
+
+### Assignment Pages
+
+- Download assignment submission files directly
+
+### Video Pages
+
+- Download embedded Zoom recordings
+
+### Moodle Tiles Format
+
+- Supports background fetching and parsing for Moodle Tiles-style courses
 
 # Licensing
 

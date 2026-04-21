@@ -13,7 +13,7 @@
     overflow-x: hidden;
   }
   :root {
-    --mb-red: #c50e20;
+    --mb-blue: #08b1ff;
   }
 }
 
@@ -23,14 +23,14 @@
   }
 
   .custom-hover {
-    @apply hover:text-mb-red hover:cursor-pointer hover:underline;
+    @apply hover:text-mb-blue hover:cursor-pointer hover:underline;
   }
 }
 
 @layer utilities {
   .scrollbar {
     --scrollbarBG: #dcdcdc;
-    --thumbBG: #c50e2080;
+    --thumbBG: #08b1ff80;
     scrollbar-width: thin;
     scrollbar-color: var(--thumbBG) var(--scrollbarBG);
   }

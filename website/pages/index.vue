@@ -1,9 +1,0 @@
-<template>
-  <AppLayout>
-    <SectionsHero></SectionsHero>
-    <SectionsSharing></SectionsSharing>
-    <SectionsAbout></SectionsAbout>
-    <SectionsContact></SectionsContact>
-    <SectionsFooter></SectionsFooter>
-  </AppLayout>
-</template>

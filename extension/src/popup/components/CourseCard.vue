@@ -3,7 +3,7 @@
     <div class="flex items-start justify-between">
       <div>
         {{ course.name }}
-        <div v-if="hasUpdates" class="inline-block w-1.5 h-1.5 mb-2 rounded-full bg-mb-red">
+        <div v-if="hasUpdates" class="inline-block w-1.5 h-1.5 mb-2 rounded-full bg-mb-blue">
           <!-- Dot -->
         </div>
         <button
@@ -105,7 +105,6 @@ import {
   MarkAsSeenMessage,
   Resource,
 } from "types"
-import { sendEvent } from "@shared/helpers"
 import { isFile, isFolder, isActivity } from "@shared/resourceHelpers"
 import useNavigation from "../composables/useNavigation"
 import { activeTab, options } from "../state"
@@ -168,7 +167,6 @@ function onOpenCourse() {
 }
 
 function onDownloadCourse() {
-  sendEvent("dashboard-download-course-full", true, { numberOfFiles: props.course.resources.length })
   if (activeTab.value?.id) {
     chrome.tabs.sendMessage(activeTab.value.id, {
       command: COMMANDS.DASHBOARD_DOWNLOAD_COURSE,
@@ -178,7 +176,6 @@ function onDownloadCourse() {
 }
 
 const onDownloadNewClick = (e: Event) => {
-  sendEvent("download-dashboard-page", true, { numberOfFiles: newResources.value.length })
   const target = e.target as HTMLButtonElement
   target.disabled = true
   if (activeTab.value?.id) {
@@ -190,8 +187,6 @@ const onDownloadNewClick = (e: Event) => {
 }
 
 const onMarkAsSeenClick = () => {
-  sendEvent("mark-as-seen-dashboard-page", true)
-
   props.course.resources.forEach((r) => (r.isNew = false))
   props.course.activities.forEach((a) => (a.isNew = false))
 
@@ -209,7 +204,6 @@ const onDetailClick = () => {
   showDetails.value = !showDetails.value
 
   if (showDetails.value) {
-    sendEvent("show-details-dashboard-page", true)
   }
 }
 

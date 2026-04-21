@@ -6,6 +6,9 @@ const firefoxProperties = {
   browser_specific_settings: {
     gecko: {
       id: "{29d2b673-83e5-4aca-a0b8-f9130b9b9cb7}",
+      data_collection_permissions: {
+        required: ["none"],
+      },
     },
   },
   background: {
@@ -16,7 +19,7 @@ const firefoxProperties = {
 const chromeProperties = {
   browser_specific_settings: {
     gecko: {
-      id: "moodlebuddy@marcelreppi",
+      id: "moodlebuddy+@yarden-carmi",
     },
   },
   background: {

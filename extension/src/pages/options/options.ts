@@ -1,4 +1,4 @@
-import { ExtensionOptions, EventMessage, Message, ExtensionStorage } from "types"
+import { ExtensionOptions, Message, ExtensionStorage } from "types"
 import { validURLRegex } from "@shared/regexHelpers"
 import { COMMANDS } from "@shared/constants"
 
@@ -26,8 +26,6 @@ async function restore() {
     document.getElementById("defaultMoodleURL")?.dispatchEvent(new Event("input"))
   })
 }
-
-let timeout: ReturnType<typeof setTimeout>
 
 async function save(e: Event) {
   e.preventDefault()
@@ -61,24 +59,6 @@ async function save(e: Event) {
         new: updatedOptions[option],
       }
     }
-  }
-
-  clearTimeout(timeout)
-  timeout = setTimeout(async () => {
-    await chrome.runtime.sendMessage({
-      command: COMMANDS.EVENT,
-      event: "modify-options",
-      saveURL: false,
-      eventData: changedOptions,
-    } satisfies EventMessage)
-  }, 500)
-
-  if (updatedOptions.disableInteractionTracking) {
-    await chrome.runtime.sendMessage({
-      command: COMMANDS.EVENT,
-      event: "disable-tracking",
-      saveURL: false,
-    } satisfies EventMessage)
   }
 
   await chrome.storage.local.set({

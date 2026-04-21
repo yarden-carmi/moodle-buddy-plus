@@ -37,8 +37,9 @@ export async function setBadgeText(text: string, tabId?: number): Promise<void> 
 }
 
 function isDisconnectedError(error: unknown): boolean {
+  if (error instanceof Error && error.name === "AbortError") return true
   const msg = error instanceof Error ? error.message : String(error)
-  return /Receiving end does not exist|Could not establish connection/i.test(msg)
+  return /Receiving end does not exist|Could not establish connection|Actor.*destroyed/i.test(msg)
 }
 
 export async function sendTabMessageSafely(tabId: number, message: unknown): Promise<void> {

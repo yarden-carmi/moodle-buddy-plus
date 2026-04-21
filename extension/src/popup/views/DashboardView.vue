@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 import { reactive, ref } from "vue"
-import { getCourseDownloadId, sendEvent } from "@shared/helpers"
+import { getCourseDownloadId } from "@shared/helpers"
 import {
   DashboardCourseData,
   DashboardUpdateCourseMessage,
@@ -80,8 +80,6 @@ async function onDownloadAll() {
     logger.debug("No courses found to download all")
     return
   }
-
-  sendEvent("dashboard-download-all")
 
   // Initialize download state
   downloadAllInProgress.value = true
@@ -148,7 +146,6 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
     courses.value = dashboardCourses
 
     if (courses.value.length === 0) {
-      sendEvent("empty-dashboard", true)
     }
 
     sortCoursesByNewestResourcesAndActivities()

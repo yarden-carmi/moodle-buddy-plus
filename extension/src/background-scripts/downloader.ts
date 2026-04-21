@@ -27,7 +27,6 @@ import {
 } from "@shared/parser"
 import { getURLRegex, getMoodleBaseURL } from "@shared/regexHelpers"
 import { getFileTypeFromURL, sanitizeFileName, padNumber, sendRuntimeMessageSafely } from "./helpers"
-import { sendLog, sendDownloadData } from "./tracker"
 import logger from "@shared/logger"
 import { COMMANDS } from "@shared/constants"
 
@@ -222,7 +221,9 @@ class Downloader {
   }
 
   async onInterrupted(id: number) {
-    this.interruptCount++
+    const [item] = await chrome.downloads.search({ id })
+    logger.error(`Download interrupted: "${item?.filename ?? id}" reason: ${item?.error ?? "unknown"}`)
+    this.errorCount++
     this.fileCount--
     this.inProgress.delete(id)
 
@@ -305,20 +306,6 @@ class Downloader {
     // Check if all downloads have completed
     if (this.isDone() && !this.sentData) {
       // All downloads have finished
-      sendDownloadData({
-        fileCount: this.fileCount,
-        byteCount: this.byteCount,
-        errorCount: this.errorCount,
-        interruptCount: this.interruptCount,
-        addCount: this.addCount,
-        removeCount: this.removeCount,
-      })
-      const { totalDownloadedFiles } = (await chrome.storage.local.get(
-        "totalDownloadedFiles"
-      )) as ExtensionStorage
-      await chrome.storage.local.set({
-        totalDownloadedFiles: totalDownloadedFiles + this.fileCount,
-      } satisfies Partial<ExtensionStorage>)
       this.sentData = true
     }
 
@@ -439,12 +426,7 @@ class Downloader {
           logger.debug(`Started download with id ${id} ${filePath}`)
           await this.onDownloadStart(id)
         } catch (err) {
-          logger.error(err)
-          sendLog({
-            errorMessage: err.message,
-            url: href,
-            fileName: `raw=${fileName} | clean=${cleanFileName} | path=${filePath}`,
-          })
+          console.error(`[MB] Download failed for "${filePath}":`, err)
           await this.onError()
         }
       } else {
@@ -473,8 +455,14 @@ class Downloader {
   private async downloadFile(resource: FileResource) {
     if (this.isCancelled) return
 
-    // Fetch the href to get the actual download URL
-    const res = await fetch(resource.href)
+    let res: Response
+    try {
+      res = await fetch(resource.href)
+    } catch (err) {
+      console.error(`[MB] Failed to fetch file "${resource.name}":`, err)
+      await this.onError()
+      return
+    }
 
     let downloadURL = res.url
 
@@ -547,8 +535,14 @@ class Downloader {
       return
     }
 
-    // Fetch the href to get the actual download URL
-    const res = await fetch(href)
+    let res: Response
+    try {
+      res = await fetch(href)
+    } catch (err) {
+      console.error(`[MB] Failed to fetch folder "${name}":`, err)
+      await this.onError()
+      return
+    }
     const body = await res.text()
     const { document } = parseHTML(body)
 
@@ -623,6 +617,7 @@ class Downloader {
     try {
       tab = await chrome.tabs.create({ url: href, active: false })
       if (!tab.id) {
+        logger.error(`Failed to create tab for page video: ${href}`)
         await this.onError()
         return
       }
@@ -690,6 +685,7 @@ class Downloader {
     try {
       tab = await chrome.tabs.create({ url: zoomUrl, active: false })
       if (!tab.id) {
+        logger.error(`Failed to create tab for Zoom recording: ${name}`)
         await this.onError()
         return
       }

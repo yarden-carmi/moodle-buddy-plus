@@ -13,7 +13,6 @@ export interface ExtensionOptions {
   prependFileIndexToFileName: boolean
   prependLastModifiedToFileName: boolean
   alwaysShowDetails: boolean
-  disableInteractionTracking: boolean
   defaultMoodleURL: string
   autoSetMoodleURL: boolean
   /**
@@ -44,10 +43,7 @@ export interface ExtensionStorage {
   browserId: string
   overviewCourseLinks: string[]
   nUpdates: number
-  userHasRated: boolean
-  totalDownloadedFiles: number
-  rateHintLevel: number
-  courseData: StoredCourseData
+courseData: StoredCourseData
   /**
    * Timestamp of last background scan in milliseconds
    */

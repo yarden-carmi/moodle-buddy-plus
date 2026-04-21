@@ -6,14 +6,14 @@ import {
   Message,
 } from "types"
 import { checkForMoodle, parseCourseLink } from "@shared/parser"
-import { updateIconFromCourses, sendLog, getCourseDownloadId } from "@shared/helpers"
+import { updateIconFromCourses, getCourseDownloadId, sendMessageSafely } from "@shared/helpers"
 
 import Course from "../models/Course"
 import logger from "@shared/logger"
 import { COMMANDS } from "@shared/constants"
 
 function sendScanResults(course) {
-  chrome.runtime.sendMessage({
+  sendMessageSafely({
     command: COMMANDS.SCAN_RESULT,
     course: {
       resources: course.resources,
@@ -42,7 +42,6 @@ async function initCoursePage() {
     })
     .catch((err) => {
       logger.error(err)
-      sendLog({ errorMessage: err.message, url: location.href, page: "course" })
       chrome.runtime.sendMessage({
         command: COMMANDS.ERROR_VIEW,
       } satisfies Message)
@@ -76,7 +75,7 @@ async function initCoursePage() {
     if (command === COMMANDS.COURSE_CRAWL) {
       const { options, selectedResources } = message as CourseCrawlMessage
 
-      chrome.runtime.sendMessage({
+      sendMessageSafely({
         command: COMMANDS.DOWNLOAD,
         id: getCourseDownloadId(command, course),
         courseName: course.name,
@@ -89,6 +88,7 @@ async function initCoursePage() {
       await course.updateStoredResources(selectedResources)
       await course.scan()
       updateIconFromCourses([course])
+      sendScanResults(course)
     }
 
     if (command === COMMANDS.ENSURE_CORRECT_BADGE) {

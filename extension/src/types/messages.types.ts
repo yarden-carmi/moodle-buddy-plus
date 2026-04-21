@@ -1,40 +1,16 @@
 import { COMMANDS } from "@shared/constants"
 import { Activity, Resource, VideoServiceResource } from "./course.types"
 import { ExtensionOptions, ExtensionStorage, SupportedPage } from "./extension.types"
-import { FeedbackPayloadData, LogPayloadData, PagePayloadData } from "./tracker.types"
-
 type Command = (typeof COMMANDS)[keyof typeof COMMANDS]
 
 export interface Message {
   command: Command
 }
 
-export interface EventMessage extends Message {
-  command: typeof COMMANDS.EVENT
-  event: string
-  saveURL: boolean
-  eventData?: Record<string, any>
-}
-
-export interface PageDataMessage extends Message {
-  command: typeof COMMANDS.PAGE_DATA
-  pageData: PagePayloadData
-}
-
-export interface FeedbackMessage extends Message {
-  command: typeof COMMANDS.FEEDBACK
-  feedbackData: FeedbackPayloadData
-}
-
 export interface SetBadgeMessage extends Message {
   command: typeof COMMANDS.SET_BADGE
   text: string
   global: boolean
-}
-
-export interface LogMessage extends Message {
-  command: typeof COMMANDS.LOG
-  logData: LogPayloadData
 }
 
 export type ScriptName = "coursePage" | "videoservicePage" | "dashboardPage"
@@ -111,7 +87,7 @@ export interface MarkAsSeenMessage extends Message {
 export interface StateData
   extends Pick<
     ExtensionStorage,
-    "options" | "nUpdates" | "userHasRated" | "totalDownloadedFiles" | "rateHintLevel"
+    "options" | "nUpdates"
   > {
   page: SupportedPage | undefined
 }

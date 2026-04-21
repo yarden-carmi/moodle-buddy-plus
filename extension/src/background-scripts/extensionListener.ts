@@ -2,18 +2,13 @@ import {
   CourseData,
   ExtensionStorage,
   StoredCourseData,
-  EventMessage,
   ExecuteScriptMessage,
-  FeedbackMessage,
-  LogMessage,
   Message,
-  PageDataMessage,
   SetBadgeMessage,
 } from "types"
 import defaultExtensionOptions from "@shared/defaultExtensionOptions"
 import { isDev } from "@shared/helpers"
 import { uuidv4, setIcon, setBadgeText, sendTabMessageSafely } from "./helpers"
-import { sendEvent, sendPageData, sendFeedback, sendLog } from "./tracker"
 import logger from "@shared/logger"
 import { COMMANDS } from "@shared/constants"
 
@@ -24,10 +19,7 @@ const initialStorage: ExtensionStorage = {
   browserId: uuidv4(),
   overviewCourseLinks: [], // Used for background scanning
   nUpdates: 0, // Used for storing updates from background scan
-  userHasRated: false,
-  totalDownloadedFiles: 0,
-  rateHintLevel: 1,
-  courseData: {},
+courseData: {},
   lastBackgroundScanMillis: Date.now(),
 }
 
@@ -36,11 +28,10 @@ async function onInstall() {
     ...initialStorage,
   } satisfies ExtensionStorage)
 
-  chrome.tabs.create({
-    url: "/pages/install/install.html",
-  })
+  // chrome.tabs.create({
+  //   url: "/pages/install/install.html",
+  // })
 
-  sendEvent("install", false)
 }
 
 async function onUpdate() {
@@ -85,13 +76,6 @@ async function onUpdate() {
     } satisfies ExtensionStorage)
   }
 
-  sendEvent("update", false)
-
-  if (!isDev) {
-    chrome.tabs.create({
-      url: "/pages/update/update.html",
-    })
-  }
 }
 
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -106,8 +90,6 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       break
   }
 
-  const { browserId } = await chrome.storage.local.get("browserId")
-  chrome.runtime.setUninstallURL(`https://moodlebuddy.com/uninstall?browserId=${browserId}`)
 })
 
 chrome.runtime.onMessage.addListener(
@@ -116,18 +98,6 @@ chrome.runtime.onMessage.addListener(
     logger.debug({ backgroundCommand: command })
 
     switch (command) {
-      case COMMANDS.EVENT:
-        const { event, saveURL, eventData } = message as EventMessage
-        sendEvent(event, saveURL, eventData)
-        break
-      case COMMANDS.PAGE_DATA:
-        const { pageData } = message as PageDataMessage
-        sendPageData(pageData)
-        break
-      case COMMANDS.FEEDBACK:
-        const { feedbackData } = message as FeedbackMessage
-        sendFeedback(feedbackData)
-        break
       case COMMANDS.SET_ICON:
         setIcon(sender.tab?.id)
         break
@@ -135,10 +105,6 @@ chrome.runtime.onMessage.addListener(
         const { text, global } = message as SetBadgeMessage
         const tabId = global ? undefined : sender.tab?.id
         setBadgeText(text, tabId)
-        break
-      case COMMANDS.LOG:
-        const { logData } = message as LogMessage
-        sendLog(logData)
         break
       case COMMANDS.CLEAR_COURSE_DATA:
         await chrome.storage.local.set({

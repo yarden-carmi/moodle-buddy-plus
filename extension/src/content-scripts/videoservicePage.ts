@@ -1,4 +1,5 @@
 import {
+  CourseData,
   DownloadProgressMessage,
   ExtensionOptions,
   ExtensionStorage,
@@ -10,7 +11,7 @@ import {
 } from "types"
 
 import { getQuerySelector, parseCourseNameFromCoursePage } from "@shared/parser"
-import { sendLog } from "@shared/helpers"
+import { sendMessageSafely } from "@shared/helpers"
 import logger from "@shared/logger"
 import { COMMANDS } from "@shared/constants"
 
@@ -18,6 +19,24 @@ let videoNodes: HTMLAnchorElement[] = []
 let videoResources: VideoServiceResource[] = []
 let cancel = false
 let error = false
+
+async function markVideosAsSeen(hrefs: string[]) {
+  const { courseData } = (await chrome.storage.local.get("courseData")) as ExtensionStorage
+  const key = location.href
+  const existing: CourseData = courseData[key] ?? {
+    seenResources: [],
+    newResources: [],
+    seenActivities: [],
+    newActivities: [],
+  }
+  const updatedSeen = Array.from(new Set([...existing.seenResources, ...hrefs]))
+  await chrome.storage.local.set({
+    courseData: {
+      ...courseData,
+      [key]: { ...existing, seenResources: updatedSeen, newResources: [] },
+    },
+  } satisfies Partial<ExtensionStorage>)
+}
 
 async function scanForVideos(options: ExtensionOptions) {
   try {
@@ -44,7 +63,7 @@ async function scanForVideos(options: ExtensionOptions) {
 
       if (videoElement !== null && fileName !== "") {
         const videoResource: VideoServiceResource = {
-          href: videoElement.src,
+          href: location.href,
           src: videoElement.src,
           name: fileName,
           section: "",
@@ -55,7 +74,6 @@ async function scanForVideos(options: ExtensionOptions) {
           sectionIndex: 1,
         }
         videoResources.push(videoResource)
-        return
       }
     }
 
@@ -90,9 +108,21 @@ async function scanForVideos(options: ExtensionOptions) {
         videoResources.push(videoResource)
       })
     }
+
+    // Mark resources as new if not previously seen
+    const { courseData } = (await chrome.storage.local.get("courseData")) as ExtensionStorage
+    const storedData = courseData[location.href]
+    if (storedData) {
+      videoResources.forEach((r) => {
+        r.isNew = !storedData.seenResources.includes(r.href)
+      })
+    } else {
+      videoResources.forEach((r) => {
+        r.isNew = true
+      })
+    }
   } catch (err) {
     logger.error(err)
-    sendLog({ errorMessage: err.message, url: location.href, page: "videoservice" })
     error = true
   }
 }
@@ -136,13 +166,13 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
     await scanForVideos(options)
 
     if (error) {
-      chrome.runtime.sendMessage({
+      sendMessageSafely({
         command: COMMANDS.ERROR_VIEW,
       } satisfies Message)
       return
     }
 
-    chrome.runtime.sendMessage({
+    sendMessageSafely({
       command: COMMANDS.SCAN_RESULT,
       videoResources,
     } satisfies VideoScanResultMessage)
@@ -155,8 +185,8 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
     const id = Date.now().toString()
     try {
       if (location.href.endsWith("view")) {
-        // A single video is being diplayed
-        await chrome.runtime.sendMessage({
+        // A single video is being displayed
+        await sendMessageSafely({
           command: COMMANDS.DOWNLOAD,
           id,
           courseLink: "",
@@ -165,7 +195,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
           resources: videoResources,
           options,
         } satisfies DownloadMessage)
-        await chrome.runtime.sendMessage({
+        await sendMessageSafely({
           command: COMMANDS.DOWNLOAD_PROGRESS,
           id,
           courseLink: "",
@@ -175,6 +205,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
           errors: 0,
           isDone: true,
         } satisfies DownloadProgressMessage)
+        await markVideosAsSeen(videoResources.map((r) => r.href))
       } else if (location.href.endsWith("browse")) {
         // A list of videos is being displayed
         const downloadVideoResources: VideoServiceResource[] = []
@@ -187,7 +218,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
               options as ExtensionOptions
             )
             const completed = i + 1
-            chrome.runtime.sendMessage({
+            sendMessageSafely({
               command: COMMANDS.DOWNLOAD_PROGRESS,
               id,
               courseLink: "",
@@ -201,12 +232,12 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
 
             if (cancel) {
               cancel = false
-              return
+              break
             }
           }
         }
 
-        chrome.runtime.sendMessage({
+        sendMessageSafely({
           command: COMMANDS.DOWNLOAD,
           id,
           courseLink: "",
@@ -215,19 +246,19 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
           resources: downloadVideoResources,
           options,
         } satisfies DownloadMessage)
+        await markVideosAsSeen(downloadVideoResources.map((r) => r.href))
       }
     } catch (err) {
       logger.error(err)
-      sendLog({ errorMessage: err.message, url: location.href, page: "videoservice" })
       error = true
-      chrome.runtime.sendMessage({
+      sendMessageSafely({
         command: COMMANDS.ERROR_VIEW,
       } satisfies Message)
     }
   }
 
   if (command === COMMANDS.CANCEL_DOWNLOAD) {
-    chrome.runtime.sendMessage({
+    sendMessageSafely({
       command: COMMANDS.CANCEL_DOWNLOAD,
     } satisfies Message)
     cancel = true
