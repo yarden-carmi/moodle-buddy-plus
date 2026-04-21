@@ -9,6 +9,10 @@ export function checkForMoodle(): boolean {
   return isMoodle
 }
 
+export function isTilesFormat(document: Document): boolean {
+  return Boolean(document.querySelector("#format-tiles-multi-section-page"))
+}
+
 export function parseCourseShortcut(document: Document, options: ExtensionOptions): string {
   if (options.customSelectorCourseShortcut) {
     const customSelectorResult = document.querySelector(options.customSelectorCourseShortcut)
@@ -119,6 +123,43 @@ export function parseCourseLink(htmlString: string): string {
   const courseURLRegex = getURLRegex("course")
   const match = htmlString.match(courseURLRegex)
   return match ? match[0] : htmlString
+}
+
+const ASSIGNMENT_NAME_SELECTORS = [
+  ".page-header-headings h1", "#page-header h1", ".page-context-header h1",
+  "#region-main h2", "#region-main h1", "h1",
+]
+
+export function parseAssignmentNameFromPage(document: Document): string {
+  for (const sel of ASSIGNMENT_NAME_SELECTORS) {
+    const text = document.querySelector(sel)?.textContent?.replace(/\s+/g, " ")?.trim()
+    if (text) return text
+  }
+  return ""
+}
+
+function getBreadcrumbItems(document: Document): HTMLElement[] {
+  const breadcrumb = document.querySelector(".breadcrumb, nav[aria-label] ol, [role='navigation'] ol")
+  return breadcrumb ? Array.from(breadcrumb.querySelectorAll("li")) : []
+}
+
+function breadcrumbText(item: HTMLElement | undefined): string {
+  return item?.textContent?.replace(/[\/]/g, "")?.replace(/\s+/g, " ")?.trim() || ""
+}
+
+export function parseCourseNameFromBreadcrumb(document: Document): string {
+  const items = getBreadcrumbItems(document)
+  const courseURLRegex = getURLRegex("course")
+  const idx = items.findIndex((item) => item.querySelector("a")?.href.match(courseURLRegex))
+  return idx !== -1 ? breadcrumbText(items[idx]) : ""
+}
+
+export function parseSectionFromBreadcrumb(document: Document): string {
+  const items = getBreadcrumbItems(document)
+  const courseURLRegex = getURLRegex("course")
+  const idx = items.findIndex((item) => item.querySelector("a")?.href.match(courseURLRegex))
+  if (idx !== -1 && idx < items.length - 2) return breadcrumbText(items[idx + 1])
+  return ""
 }
 
 type QuerySelectorTypes =
@@ -316,9 +357,9 @@ export function parseActivityNameFromNode(node: HTMLElement): string {
 }
 
 export function parseActivityTypeFromNode(node: HTMLElement): string {
-  const modtypeClassResult = node.className.match(/modtype.*(?= )/gi)
-  if (modtypeClassResult) {
-    const activityType = modtypeClassResult[0].split("_")[1]
+  const modtypeClass = Array.from(node.classList).find((className) => className.startsWith("modtype_"))
+  if (modtypeClass) {
+    const activityType = modtypeClass.replace(/^modtype_/, "").trim()
     if (activityType) {
       return activityType
     }
@@ -382,6 +423,10 @@ export function parseSectionName(
       return textContent
     }
   }
+
+  // Tiles format section title
+  const tileText = section.querySelector("h3")?.textContent?.trim()
+  if (tileText) return tileText
 
   if (section.id === "section-0") {
     // Make an exception for section 0

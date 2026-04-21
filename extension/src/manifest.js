@@ -61,7 +61,15 @@ function getManifest() {
       default_popup: "popup/index.html",
     },
     host_permissions: ["<all_urls>"],
-    permissions: ["activeTab", "downloads", "storage", "scripting"],
+    permissions: [
+      "activeTab",
+      "declarativeNetRequest",
+      "downloads",
+      ...(TARGET !== "firefox" ? ["offscreen"] : []),
+      "storage",
+      "scripting",
+      "tabs",
+    ],
     content_scripts: [
       {
         matches: ["<all_urls>"],

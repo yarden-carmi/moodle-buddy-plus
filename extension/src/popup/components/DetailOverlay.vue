@@ -17,13 +17,24 @@
         </div>
       </div>
       <div v-if="folders.length > 0">
-        <div class="font-bold">Folders</div>
+        <div class="font-bold">{{ hasAssignments ? "Assignments" : "Folders" }}</div>
         <div class="pl-3 break-normal">
           <div v-for="(folder, i) in folders" :key="i">
             <div class="inline-block right-arrow"></div>
             {{ folder.name }} {{ getHintText(folder) }}
           </div>
         </div>
+      </div>
+      <div v-for="cat in extraCategories" :key="cat.label">
+        <template v-if="cat.items.length > 0">
+          <div class="font-bold">{{ cat.label }}</div>
+          <div class="pl-3 break-normal">
+            <div v-for="(item, i) in cat.items" :key="i">
+              <div class="inline-block right-arrow"></div>
+              {{ item.name }} {{ getHintText(item) }}
+            </div>
+          </div>
+        </template>
       </div>
     </div>
   </div>
@@ -32,7 +43,7 @@
 <script setup lang="ts">
 import { Resource } from "types"
 import { computed } from "vue"
-import { isFile, isFolder, isVideoServiceVideo } from "@shared/resourceHelpers"
+import { isAssignment, isFile, isFolder, isVideoServiceVideo, RESOURCE_CATEGORIES } from "@shared/resourceHelpers"
 import { XMarkIcon } from "@heroicons/vue/24/outline"
 
 const props = defineProps<{
@@ -43,7 +54,16 @@ const props = defineProps<{
 const files = computed<Resource[]>(() =>
   props.resources.filter((r) => isFile(r) || isVideoServiceVideo(r))
 )
-const folders = computed<Resource[]>(() => props.resources.filter(isFolder))
+const folders = computed<Resource[]>(() =>
+  props.resources.filter((r) => isFolder(r) || isAssignment(r))
+)
+const hasAssignments = computed(() => folders.value.some(isAssignment))
+const extraCategories = computed(() =>
+  RESOURCE_CATEGORIES.filter((c) => c.key !== "file" && c.key !== "folder").map((c) => ({
+    label: c.displayName,
+    items: props.resources.filter(c.filter),
+  }))
+)
 
 const getHintText = (r: Resource) => {
   if (r.isNew) return "(new)"

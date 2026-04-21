@@ -7,16 +7,11 @@
     @mark-as-seen="onMarkAsSeen"
   >
     <template #simple-selection>
-      <label>
-        <input v-model="downloadFiles" type="checkbox" :disabled="disableFilesCb" />
+      <label v-for="cat in categoryStats" :key="cat.key" v-show="cat.alwaysShow || cat.total > 0 || cat.nNew > 0">
+        <input v-model="downloads[cat.key]" type="checkbox" :disabled="onlyNewResources ? cat.nNew + cat.nUpdated === 0 : cat.total === 0" />
         <span class="ml-1">
-          {{ onlyNewResources ? nNewFiles + nUpdatedFiles : nFiles }} file(s) (PDF, etc.)
-        </span>
-      </label>
-      <label>
-        <input v-model="downloadFolders" type="checkbox" :disabled="disableFoldersCb" />
-        <span class="ml-1">
-          {{ onlyNewResources ? nNewFolders + nUpdatedFolders : nFolders }} folder(s)
+          {{ onlyNewResources ? cat.nNew + cat.nUpdated : cat.total }}
+          {{ cat.displayLabel }}
         </span>
       </label>
     </template>
@@ -28,9 +23,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue"
+import { ref, computed, watch, reactive } from "vue"
 import { sendEvent } from "@shared/helpers"
-import { isFile, isFolder } from "@shared/resourceHelpers"
+import { isAssignment, RESOURCE_CATEGORIES } from "@shared/resourceHelpers"
 import { Resource, Activity, Message, CourseScanResultMessage } from "@types"
 import FilesViewLayout from "../components/FilesViewLayout.vue"
 import DetailedResourceSelection from "../components/DetailedResourceSelection.vue"
@@ -40,82 +35,70 @@ import { COMMANDS } from "@shared/constants"
 // Resources
 const resources = ref<Resource[]>([])
 const activities = ref<Activity[]>([])
-const nFiles = computed(() => resources.value.filter(isFile).length)
-const nNewFiles = computed(() => resources.value.filter((r) => isFile(r) && r.isNew).length)
-const nUpdatedFiles = computed(() => resources.value.filter((r) => isFile(r) && r.isUpdated).length)
-const nFolders = computed(() => resources.value.filter(isFolder).length)
-const nNewFolders = computed(() => resources.value.filter((r) => isFolder(r) && r.isNew).length)
-const nUpdatedFolders = computed(
-  () => resources.value.filter((r) => isFolder(r) && r.isUpdated).length
+
+const categoryStats = computed(() =>
+  RESOURCE_CATEGORIES.map((cat) => {
+    const filtered = resources.value.filter(cat.filter)
+    return {
+      ...cat,
+      total: filtered.length,
+      nNew: filtered.filter((r) => r.isNew).length,
+      nUpdated: filtered.filter((r) => r.isUpdated).length,
+      displayLabel: cat.key === "folder" && filtered.some(isAssignment) ? "assignment(s)" : cat.label,
+    }
+  })
 )
-const nNewAndUpdatedResources = computed(
-  () => nNewFiles.value + nUpdatedFiles.value + nNewFolders.value + nUpdatedFolders.value
+
+const nNewAndUpdatedResources = computed(() =>
+  categoryStats.value.reduce((sum, c) => sum + c.nNew + c.nUpdated, 0)
 )
 const nNewActivities = computed(() => activities.value.filter((a) => a.isNew).length)
 
 // Checkboxes
-const downloadFiles = ref(false)
-const downloadFolders = ref(false)
-const disableFilesCb = computed(() => {
-  if (onlyNewResources.value) {
-    return nNewFiles.value + nUpdatedFiles.value === 0
-  }
-  return nFiles.value === 0
-})
-const disableFoldersCb = computed(() => {
-  if (onlyNewResources.value) {
-    return nNewFolders.value + nUpdatedFolders.value === 0
-  }
-  return nFolders.value === 0
-})
+const downloads = reactive<Record<string, boolean>>(
+  Object.fromEntries(RESOURCE_CATEGORIES.map((c) => [c.key, false]))
+)
+
 const setCheckboxState = () => {
-  if (onlyNewResources.value) {
-    downloadFiles.value = nNewFiles.value + nUpdatedFiles.value !== 0
-    downloadFolders.value = nNewFolders.value + nUpdatedFolders.value !== 0
-  } else {
-    downloadFiles.value = nFiles.value !== 0
-    downloadFolders.value = nFolders.value !== 0
+  for (const cat of categoryStats.value) {
+    downloads[cat.key] = onlyNewResources.value
+      ? cat.nNew + cat.nUpdated !== 0
+      : cat.total !== 0
   }
 }
-const setFilesSelected = () =>
-  resources.value.filter(isFile).forEach((r) => {
-    if (onlyNewResources.value) {
-      r.selected = downloadFiles.value && (r.isNew || r.isUpdated)
-    } else {
-      r.selected = downloadFiles.value
-    }
-  })
 
-const setFoldersSelected = () =>
-  resources.value.filter(isFolder).forEach((r) => {
+const setSelected = (catKey: string) => {
+  const cat = RESOURCE_CATEGORIES.find((c) => c.key === catKey)!
+  resources.value.filter(cat.filter).forEach((r) => {
     if (onlyNewResources.value) {
-      r.selected = downloadFolders.value && (r.isNew || r.isUpdated)
+      r.selected = downloads[catKey] && (r.isNew || r.isUpdated)
     } else {
-      r.selected = downloadFolders.value
+      r.selected = downloads[catKey]
     }
   })
+}
+
+const setAllSelected = () => RESOURCE_CATEGORIES.forEach((c) => setSelected(c.key))
+
+for (const cat of RESOURCE_CATEGORIES) {
+  watch(() => downloads[cat.key], () => setSelected(cat.key))
+}
+
 watch(onlyNewResources, () => {
   if (currentSelectionTab.value?.id === "simple") {
     setCheckboxState()
   }
-
-  setFilesSelected()
-  setFoldersSelected()
+  setAllSelected()
 })
-watch(downloadFiles, setFilesSelected)
-watch(downloadFolders, setFoldersSelected)
 
 // Selection Tab
 watch(currentSelectionTab, () => {
   if (currentSelectionTab.value?.id === "simple") {
     setCheckboxState()
   } else if (currentSelectionTab.value?.id === "detailed") {
-    downloadFiles.value = false
-    downloadFolders.value = false
+    for (const key of Object.keys(downloads)) downloads[key] = false
   }
-
-  setFilesSelected()
-  setFoldersSelected()
+  setAllSelected()
 })
 
 // Download
@@ -157,8 +140,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
     }
 
     setCheckboxState()
-    setFilesSelected()
-    setFoldersSelected()
+    setAllSelected()
   }
 })
 

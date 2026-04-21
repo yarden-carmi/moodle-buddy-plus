@@ -6,6 +6,7 @@ type URLRegexType =
   | "dashboard"
   | "course"
   | "courseResources"
+  | "assignment"
   | "videoservice"
   | "file"
   | "folder"
@@ -15,8 +16,9 @@ type URLRegexType =
 
 const loginPageRegex = /\/login\/index.php/gi
 const dashboardPageRegex = /\/my/gi
-const coursePageRegex = /\/course\/view\.php\?id=[0-9]*/gi
+const coursePageRegex = /\/course\/(view|section)\.php\?id=[0-9]*/gi
 const courseResourcesPageRegex = /\/course\/resources\.php\?id=[0-9]*/gi
+const assignmentPageRegex = /\/mod\/assign\/view\.php\?(?=[^#]*\bid=[0-9]+)[^#]*/gi
 const videoServicePageRegex = /\/mod\/videoservice\/view\.php/gi
 
 const fileRegex = /\/mod\/resource\/view\.php\?id=[0-9]*/gi
@@ -30,6 +32,7 @@ const allRegexes: Record<URLRegexType, RegExp> = {
   dashboard: dashboardPageRegex,
   course: coursePageRegex,
   courseResources: courseResourcesPageRegex,
+  assignment: assignmentPageRegex,
   videoservice: videoServicePageRegex,
   file: fileRegex,
   folder: folderRegex,

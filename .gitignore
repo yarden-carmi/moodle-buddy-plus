@@ -6,11 +6,12 @@ text
 .idea
 .npmrc
 mariadb
+Moodle/
 
 test/**
 !test/index.js
 
 *.rest
-*.zip
+
 *.env*
 !.env.example

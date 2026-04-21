@@ -58,7 +58,7 @@
 
       <div v-if="folderResources.length > 0">
         <label class="category" @input="(e) => onCategoryClick(e, 'folder')">
-          <span>Folders</span>
+          <span>{{ hasAssignments ? "Assignments" : "Folders" }}</span>
           <div>
             <input :ref="setCbRef('foldersCb')" class="mt-1" type="checkbox" />
           </div>
@@ -90,6 +90,42 @@
           </div>
         </label>
       </div>
+      <div v-for="cat in extraCategories" :key="cat.key">
+        <template v-if="cat.resources.length > 0">
+          <label class="category" @input="(e) => onCategoryClick(e, cat.key)">
+            <span>{{ cat.displayName }}</span>
+            <div>
+              <input :ref="setCbRef(`${cat.key}Cb`)" class="mt-1" type="checkbox" />
+            </div>
+          </label>
+          <label
+            v-for="(r, i) in cat.resources"
+            :id="`${cat.key}Cb${String(i)}`"
+            :key="`${cat.key}Cb${String(i)}`"
+            :data-href="r.href"
+            class="resource"
+            @mousemove="onMouseOver"
+            @input="onCheck"
+          >
+            <span class="resource">{{ r.name }}</span>
+            <div>
+              <ArrowTopRightOnSquareIcon
+                class="size-4 mt-0.5"
+                @click.prevent="openURL(r.href)"
+              ></ArrowTopRightOnSquareIcon>
+            </div>
+            <div>
+              <input
+                :ref="setCbRef(`${cat.key}Cb${String(i)}`)"
+                :data-href="r.href"
+                type="checkbox"
+                :checked="r.selected"
+                class="mt-1"
+              />
+            </div>
+          </label>
+        </template>
+      </div>
     </div>
   </div>
 </template>
@@ -98,16 +134,18 @@
 import { computed, reactive, ref } from "vue"
 import { Resource } from "types"
 import {
+  isAssignment,
   isFile,
   isFolder,
   isVideoServiceVideo,
+  RESOURCE_CATEGORIES,
   setResourceSelected,
 } from "@shared/resourceHelpers"
 import useNavigation from "../composables/useNavigation"
 import { onlyNewResources } from "../state"
 import { ArrowTopRightOnSquareIcon } from "@heroicons/vue/24/outline"
 
-type CbCategory = "all" | "file" | "folder"
+type CbCategory = "all" | "file" | "folder" | string
 
 const props = defineProps<{
   resources: Resource[]
@@ -143,7 +181,14 @@ const filteredResources = computed(() => {
 const fileResources = computed(() =>
   filteredResources.value.filter((r) => isFile(r) || isVideoServiceVideo(r))
 )
-const folderResources = computed(() => filteredResources.value.filter(isFolder))
+const folderResources = computed(() => filteredResources.value.filter((r) => isFolder(r) || isAssignment(r)))
+const hasAssignments = computed(() => folderResources.value.some(isAssignment))
+const extraCategories = computed(() =>
+  RESOURCE_CATEGORIES.filter((c) => c.key !== "file" && c.key !== "folder").map((c) => ({
+    ...c,
+    resources: filteredResources.value.filter(c.filter),
+  }))
+)
 
 const onMouseOver = (e: Event) => {
   if (mouseDown.value) {
