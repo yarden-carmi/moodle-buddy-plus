@@ -22,13 +22,13 @@ if [ "$EXT_VERSION" == "$LATEST_TAG" ]; then
   echo "Version $EXT_VERSION already exists."
 fi
 
-zip -r "../moodle-buddy-$TARGET.zip" .
+find . -type f | zip "../moodle-buddy-$TARGET.zip" -@
 cd ..
 
 # Copy all necessary files to tmp directory
 mkdir tmp
 mkdir tmp/extension
-cp -r ../screenshots ../README.md tmp
+cp -r ../screenshots ../README.md ../BUILD.md tmp
 cp -r src webpack.config.js package.json package-lock.json tsconfig.json tailwind.config.js postcss.config.js tmp/extension
 cd tmp
 

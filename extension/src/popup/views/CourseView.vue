@@ -24,7 +24,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, reactive } from "vue"
-import { sendEvent } from "@shared/helpers"
 import { isAssignment, RESOURCE_CATEGORIES } from "@shared/resourceHelpers"
 import { Resource, Activity, Message, CourseScanResultMessage } from "@types"
 import FilesViewLayout from "../components/FilesViewLayout.vue"
@@ -107,12 +106,10 @@ const onDownload = (selectedResources: Resource[]) => {
   if (onlyNewResources.value) {
     eventParts.push("only-new")
   }
-  sendEvent(eventParts.join("-"), true, { numberOfFiles: selectedResources.length })
 }
 
 // Mark as seen
 const onMarkAsSeen = () => {
-  sendEvent("mark-as-seen-course-page", true)
   resources.value.forEach((r) => {
     r.isNew = false
     r.isUpdated = false

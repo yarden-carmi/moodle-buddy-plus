@@ -1,5 +1,5 @@
 import { COMMANDS } from "@shared/constants"
-import { isDev, sendEvent, sendPageData } from "@shared/helpers"
+import { isDev } from "@shared/helpers"
 import logger from "@shared/logger"
 import { ExtensionStorage, Message, StateMessage } from "@types"
 import "./backgroundScanner"
@@ -15,11 +15,11 @@ chrome.runtime.sendMessage({
 
 async function updateVueState() {
   const localStorage = (await chrome.storage.local.get()) as ExtensionStorage
-  const { options, nUpdates, userHasRated, totalDownloadedFiles, rateHintLevel } = localStorage
+  const { options, nUpdates } = localStorage
   logger.debug({ localStorage })
   chrome.runtime.sendMessage({
     command: COMMANDS.STATE,
-    state: { page, options, nUpdates, userHasRated, totalDownloadedFiles, rateHintLevel },
+    state: { page, options, nUpdates },
   } satisfies StateMessage)
 }
 
@@ -31,25 +31,4 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
     updateVueState()
   }
 
-  if (command === COMMANDS.TRACK_PAGE_VIEW) {
-    if (page === undefined) return
-
-    sendEvent(`view-${page}-page`, true)
-    sendPageData(page)
-  }
-
-  if (command === COMMANDS.RATE_CLICK) {
-    await chrome.storage.local.set({
-      userHasRated: true,
-    } satisfies Partial<ExtensionStorage>)
-    updateVueState()
-  }
-
-  if (command === COMMANDS.AVOID_RATE_CLICK) {
-    const { rateHintLevel } = (await chrome.storage.local.get()) as ExtensionStorage
-    await chrome.storage.local.set({
-      rateHintLevel: rateHintLevel + 1,
-    } satisfies Partial<ExtensionStorage>)
-    updateVueState()
-  }
 })

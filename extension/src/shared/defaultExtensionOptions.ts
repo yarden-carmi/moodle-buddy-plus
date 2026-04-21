@@ -1,7 +1,7 @@
 import { ExtensionOptions } from "@types"
 
 const defaultExtensionOptions: ExtensionOptions = {
-  onlyNewResources: false,
+  onlyNewResources: true,
   useMoodleFileName: true,
   showDownloadOptions: false,
   prependCourseShortcutToFileName: false,
@@ -10,8 +10,7 @@ const defaultExtensionOptions: ExtensionOptions = {
   prependSectionIndexToFileName: false,
   prependFileIndexToFileName: false,
   prependLastModifiedToFileName: false,
-  alwaysShowDetails: false,
-  disableInteractionTracking: false,
+  alwaysShowDetails: true,
   defaultMoodleURL: "",
   autoSetMoodleURL: true,
   backgroundScanInterval: 30,
@@ -25,7 +24,7 @@ const defaultExtensionOptions: ExtensionOptions = {
   includeImage: true,
   maxConcurrentDownloads: 100,
   maxCoursesOnDashboardPage: 100,
-  detectFileUpdates: false,
+  detectFileUpdates: true,
   customSelectorCourseName: "",
   customSelectorCourseShortcut: "",
   customSelectorSectionElement: "",

@@ -12,7 +12,7 @@ import {
   DashboardCourseData,
 } from "types"
 import { checkForMoodle, parseCourseLink } from "@shared/parser"
-import { updateIconFromCourses, sendLog, isDebug, getCourseDownloadId } from "@shared/helpers"
+import { updateIconFromCourses, isDebug, getCourseDownloadId } from "@shared/helpers"
 import Course from "../models/Course"
 import { getURLRegex } from "@shared/regexHelpers"
 import logger from "@shared/logger"
@@ -155,7 +155,6 @@ async function scanOverview(retry = 0) {
           scanTotal--
           error = true
           logger.error(err)
-          sendLog({ errorMessage: err.message, url: link, page: "dashboard" })
         }
         sendScanProgress()
       }
@@ -172,7 +171,6 @@ async function scanOverview(retry = 0) {
   } catch (err) {
     error = true
     logger.error(err)
-    sendLog({ errorMessage: err.message, url: location.href, page: "dashboard" })
   }
 }
 

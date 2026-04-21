@@ -1,7 +1,7 @@
 {
   "name": "moodle-buddy",
-  "version": "1.58.0",
-  "displayName": "Moodle Buddy",
+  "version": "1.6",
+  "displayName": "Moodle Buddy+",
   "description": "Moodle Buddy offers mass file download and notification functionality for the moodle learning management platform.",
   "author": "Marcel Reppenhagen",
   "main": "manifest.json",
@@ -10,7 +10,7 @@
     "dev:prepare": "node scripts/prepare.js",
     "start": "npm run start:nightly",
     "start:nightly": "web-ext run --source-dir ./build --firefox=nightly --browser-console",
-    "start:ff": "web-ext run --source-dir ./build --browser-console",
+    "start:ff": "web-ext run --source-dir ./build --browser-console --firefox-profile ./ff-profile --keep-profile-changes --profile-create-if-missing",
     "start:chrome": "web-ext run --source-dir ./build --target=chromium --browser-console",
     "dev": "npm run dev:ff",
     "dev:ff": "npm run nuke && cross-env NODE_ENV=development TARGET=firefox webpack",
@@ -33,10 +33,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/marcelreppi/moodle-buddy.git"
+    "url": "git+https://github.com/yarden-carmi/moodle-buddy.git"
   },
   "bugs": {
-    "url": "https://github.com/marcelreppi/moodle-buddy/issues"
+    "url": "https://github.com/yarden-carmi/moodle-buddy/issues"
   },
   "dependencies": {
     "@heroicons/vue": "^2.1.3",

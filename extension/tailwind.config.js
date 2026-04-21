@@ -3,8 +3,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "mb-red": "#c50e20",
-        "mb-red-light": "#cf293a",
+        "mb-blue": "#08b1ff",
+        "mb-blue-light": "#29bcff",
       },
       boxShadow: {
         custom: "0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24)",
@@ -22,8 +22,8 @@ module.exports = {
     themes: [
       {
         moodlebuddy: {
-          primary: "#c50e20",
-          "primary-focus": "#4506cb",
+          primary: "#08b1ff",
+          "primary-focus": "#0699e0",
           "primary-content": "#ffffff",
 
           secondary: "#57086d",

@@ -29,7 +29,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from "vue"
-import { sendEvent } from "@shared/helpers"
 import { VideoServiceResource, Message, VideoScanResultMessage, Resource } from "@types"
 import FilesViewLayout from "../components/FilesViewLayout.vue"
 import DetailedResourceSelection from "../components/DetailedResourceSelection.vue"
@@ -57,10 +56,7 @@ watch(currentSelectionTab, () => {
   setVideosSelected()
 })
 
-const onDownload = (selectedResources: Resource[]) => {
-  const eventParts = ["download-videoservice-page", currentSelectionTab.value?.id]
-  sendEvent(eventParts.join("-"), true, { numberOfFiles: selectedResources.length })
-}
+const onDownload = (_selectedResources: Resource[]) => {}
 
 chrome.runtime.onMessage.addListener(async (message: Message) => {
   const { command } = message

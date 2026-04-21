@@ -1,4 +1,6 @@
+website/
 node_modules
+extension/ff-profile
 .cache
 build
 text
@@ -15,3 +17,9 @@ test/**
 
 *.env*
 !.env.example
+website/*
+.claude/settings.local.json
+logo.psd
+extension/moodle-buddy-firefox.zip
+extension/moodle-buddy-chrome.zip
+extension/moodle-buddy-code.zip

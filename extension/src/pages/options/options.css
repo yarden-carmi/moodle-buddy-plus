@@ -45,7 +45,7 @@ input[type="checkbox"] ~ label {
 #invalid-url {
   margin-bottom: 10px;
   font-weight: bold;
-  color: #c50e20;
+  color: #08b1ff;
   display: none;
 }
 
@@ -70,7 +70,7 @@ input[type="checkbox"] ~ label {
   padding: 7px 10px;
   border-radius: 5px;
   border: 0;
-  background-color: #c50e20;
+  background-color: #08b1ff;
   color: white;
   font-weight: bold;
   text-align: center;

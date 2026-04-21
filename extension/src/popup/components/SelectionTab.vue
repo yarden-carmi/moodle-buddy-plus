@@ -37,6 +37,6 @@ currentSelectionTab.value = props.tabs[0]
 }
 
 .active-tab {
-  @apply border-mb-red text-black;
+  @apply border-mb-blue text-black;
 }
 </style>

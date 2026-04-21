@@ -1,11 +1,5 @@
 import {
-  EventMessage,
-  LogMessage,
   SetBadgeMessage,
-  LogPayloadData,
-  PageDataMessage,
-  PagePayloadData,
-  SupportedPage,
   ExtensionStorage,
   DashboardCourseData,
 } from "types"
@@ -17,39 +11,18 @@ import { browserName } from "detect-browser"
 export const isDev = process.env.NODE_ENV !== "production"
 export const isDebug = process.env.NODE_ENV === "debug"
 
-export function sendEvent(
-  event: string,
-  saveURL = true,
-  eventData: Record<string, unknown> = {}
-): void {
-  chrome.runtime.sendMessage({
-    command: COMMANDS.EVENT,
-    event,
-    saveURL,
-    eventData,
-  } satisfies EventMessage)
+function isDisconnectedError(error: unknown): boolean {
+  if (error instanceof Error && error.name === "AbortError") return true
+  const msg = error instanceof Error ? error.message : String(error)
+  return /Receiving end does not exist|Could not establish connection|Actor.*destroyed/i.test(msg)
 }
 
-export function sendLog(logData: LogPayloadData): void {
-  chrome.runtime.sendMessage({
-    command: COMMANDS.LOG,
-    logData,
-  } satisfies LogMessage)
-
-  if (logData.page) {
-    sendPageData(logData.page)
+export async function sendMessageSafely(message: unknown): Promise<void> {
+  try {
+    await chrome.runtime.sendMessage(message)
+  } catch (error) {
+    if (!isDisconnectedError(error)) throw error
   }
-}
-
-export function sendPageData(page: SupportedPage) {
-  const pageData: PagePayloadData = {
-    page,
-    content: document.querySelector("html")?.outerHTML || "",
-  }
-  chrome.runtime.sendMessage({
-    command: COMMANDS.PAGE_DATA,
-    pageData,
-  } satisfies PageDataMessage)
 }
 
 export async function getActiveTab(): Promise<chrome.tabs.Tab | undefined> {
@@ -77,7 +50,7 @@ export async function updateIconFromCourses(courses: Course[]) {
 
   // If there are no further updates reset the icon
   const text = nUpdates === 0 ? "" : nUpdates.toString()
-  chrome.runtime.sendMessage({
+  sendMessageSafely({
     command: COMMANDS.SET_BADGE,
     text,
     global: false,

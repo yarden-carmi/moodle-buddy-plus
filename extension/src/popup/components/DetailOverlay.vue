@@ -3,7 +3,7 @@
     class="absolute left-0 top-0 flex flex-col w-full h-full bg-white rounded shadow-custom py-3"
   >
     <XMarkIcon
-      class="w-7 absolute right-5 top-3 stroke-current hover:text-mb-red hover:cursor-pointer"
+      class="w-7 absolute right-5 top-3 stroke-current hover:text-mb-blue hover:cursor-pointer"
       @click="toggleDetails"
     ></XMarkIcon>
     <div class="pl-8 pr-12 space-y-2 overflow-auto scrollbar">
@@ -78,7 +78,7 @@ const getHintText = (r: Resource) => {
   height: 0;
   border-top: 3px solid transparent;
   border-bottom: 3px solid transparent;
-  border-left: 6px solid var(--mb-red);
+  border-left: 6px solid var(--mb-blue);
   margin-bottom: 3px;
   margin-right: 2px;
 }
