@@ -3,13 +3,21 @@ import {
   DashboardDownloadCourseMessage,
   DashboardScanResultMessage,
   DownloadMessage,
+  DownloadProgressMessage,
   MarkAsSeenMessage,
   Message,
   ScanInProgressMessage,
   ExtensionStorage,
   DashboardUpdateCourseMessage,
   DashboardCourseData,
+  Resource,
 } from "types"
+import {
+  isZoomRecording,
+  isVideoServiceVideo,
+  isSidebarVideo,
+  isEmbeddedVideo,
+} from "@shared/resourceHelpers"
 import { checkForMoodle, parseCourseLink } from "@shared/parser"
 import { updateIconFromCourses, isDebug, getCourseDownloadId } from "@shared/helpers"
 import Course from "../models/Course"
@@ -18,6 +26,27 @@ import logger from "@shared/logger"
 import { COMMANDS } from "@shared/constants"
 
 const SCAN_CONCURRENCY = 5
+
+function stripVideoResources(resources: Resource[]): Resource[] {
+  return resources.filter(
+    (r) =>
+      !isZoomRecording(r) && !isVideoServiceVideo(r) && !isSidebarVideo(r) && !isEmbeddedVideo(r)
+  )
+}
+
+function sendPendingProgress(course: Course, id: string) {
+  chrome.runtime.sendMessage({
+    command: COMMANDS.DOWNLOAD_PROGRESS,
+    id,
+    courseLink: course.link,
+    courseName: course.name,
+    errors: 0,
+    total: 0,
+    completed: 0,
+    isDone: false,
+    isPending: true,
+  } satisfies DownloadProgressMessage)
+}
 
 let error = false
 let scanInProgress = true
@@ -337,16 +366,20 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
 
   if (command === COMMANDS.DASHBOARD_DOWNLOAD_NEW) {
     const { link } = message as DashboardDownloadCourseMessage
+    const id = getCourseDownloadId(command, { link } as Course)
+    const placeholderCourse = courses.find((c) => c.link === link)
+    if (placeholderCourse) sendPendingProgress(placeholderCourse, id)
     const course = await ensureCourseScanned(link)
     const { options } = (await chrome.storage.local.get("options")) as ExtensionStorage
-    const downloadNodes = course.resources.filter((r) => r.isNew)
+    const downloadNodes = stripVideoResources(course.resources.filter((r) => r.isNew))
 
     chrome.runtime.sendMessage({
       command: COMMANDS.DOWNLOAD,
-      id: getCourseDownloadId(command, course),
+      id,
       courseLink: course.link,
       courseName: course.name,
       courseShortcut: course.shortcut,
+      courseGroup: course.group,
       resources: downloadNodes,
       options,
     } satisfies DownloadMessage)
@@ -370,9 +403,19 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
 
   if (command === COMMANDS.DASHBOARD_DOWNLOAD_COURSE) {
     const { options } = (await chrome.storage.local.get("options")) as ExtensionStorage
-    const { link } = message as DashboardDownloadCourseMessage
+    const { link, includeSeen } = message as DashboardDownloadCourseMessage
+    const placeholderCourse = courses.find((c) => c.link === link)
+    const id = placeholderCourse
+      ? getCourseDownloadId(command, placeholderCourse)
+      : getCourseDownloadId(command, { link } as Course)
+    if (placeholderCourse) sendPendingProgress(placeholderCourse, id)
+    const wasCollapsed = !scannedLinks.has(link)
     const course = await ensureCourseScanned(link)
-    const id = getCourseDownloadId(command, course)
+    const filteredByNew =
+      wasCollapsed && !includeSeen
+        ? course.resources.filter((r) => r.isNew || r.isUpdated)
+        : course.resources
+    const downloadResources = stripVideoResources(filteredByNew)
 
     chrome.runtime.sendMessage({
       command: COMMANDS.DOWNLOAD,
@@ -380,7 +423,8 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
       courseLink: course.link,
       courseName: course.name,
       courseShortcut: course.shortcut,
-      resources: course.resources,
+      courseGroup: course.group,
+      resources: downloadResources,
       options,
     } satisfies DownloadMessage)
 

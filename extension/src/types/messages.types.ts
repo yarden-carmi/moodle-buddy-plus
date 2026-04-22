@@ -23,6 +23,7 @@ export interface ExecuteScriptMessage extends Message {
 export interface DashboardDownloadCourseMessage extends Message {
   command: typeof COMMANDS.DASHBOARD_DOWNLOAD_NEW | typeof COMMANDS.DASHBOARD_DOWNLOAD_COURSE
   link: string
+  includeSeen?: boolean
 }
 
 type CrawlOptions = Pick<
