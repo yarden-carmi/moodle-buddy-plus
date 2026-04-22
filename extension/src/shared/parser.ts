@@ -52,6 +52,11 @@ export function parseCourseShortcut(document: Document, options: ExtensionOption
   return "Unknown Shortcut"
 }
 
+export function parseCourseNumberFromCoursePage(document: Document): string {
+  const h = document.querySelector<HTMLElement>(".page-header-headings h1[title]")
+  return h?.getAttribute("title")?.trim() ?? ""
+}
+
 export function parseCourseNameFromCoursePage(
   document: Document,
   options: ExtensionOptions
@@ -141,6 +146,40 @@ export function parseCourseGroupFromCoursePage(document: Document, courseLink: s
     }
   }
   return ""
+}
+
+// True if the FCL panel containing this course has another course with the
+// same display name (used to disambiguate folder names when downloading from
+// a single course page, where peer-course context is not otherwise available).
+export function hasSiblingCourseWithSameName(
+  document: Document,
+  courseLink: string,
+  courseName: string
+): boolean {
+  if (!courseName) return false
+  const idMatch = courseLink.match(/[?&]id=(\d+)/)
+  if (!idMatch) return false
+  const myId = idMatch[1]
+
+  const panels = document.querySelectorAll<HTMLElement>(
+    ".block_filtered_course_list .block-fcl__list"
+  )
+  for (const panel of Array.from(panels)) {
+    const anchors = Array.from(
+      panel.querySelectorAll<HTMLAnchorElement>("a[href*='view.php?id=']")
+    )
+    if (!anchors.some((a) => a.getAttribute("href")?.includes(`id=${myId}`))) continue
+
+    return anchors.some((a) => {
+      const m = a.getAttribute("href")?.match(/[?&]id=(\d+)/)
+      if (!m || m[1] === myId) return false
+      const clone = a.cloneNode(true) as HTMLElement
+      clone.querySelectorAll(".sr-only, [data-region='icon']").forEach((el) => el.remove())
+      const label = (clone.textContent ?? "").trim()
+      return label.startsWith(courseName)
+    })
+  }
+  return false
 }
 
 export function parseCourseLink(htmlString: string): string {

@@ -5,7 +5,7 @@ import {
   ExtensionStorage,
   Message,
 } from "types"
-import { checkForMoodle, parseCourseLink } from "@shared/parser"
+import { checkForMoodle, parseCourseLink, hasSiblingCourseWithSameName } from "@shared/parser"
 import { updateIconFromCourses, getCourseDownloadId, sendMessageSafely } from "@shared/helpers"
 
 import Course from "../models/Course"
@@ -75,10 +75,14 @@ async function initCoursePage() {
     if (command === COMMANDS.COURSE_CRAWL) {
       const { options, selectedResources } = message as CourseCrawlMessage
 
+      const hasDup = hasSiblingCourseWithSameName(document, course.link, course.name)
+      const dispatchedCourseName =
+        hasDup && course.number ? `${course.name} (${course.number})` : course.name
+
       sendMessageSafely({
         command: COMMANDS.DOWNLOAD,
         id: getCourseDownloadId(command, course),
-        courseName: course.name,
+        courseName: dispatchedCourseName,
         courseShortcut: course.shortcut,
         courseGroup: course.group,
         courseLink: course.link,

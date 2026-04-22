@@ -33,6 +33,7 @@ class Course {
   link: string
   HTMLDocument: Document
   name: string
+  number: string
   shortcut: string
   group: string
   isFirstScan: boolean
@@ -54,6 +55,7 @@ class Course {
     this.HTMLDocument = HTMLDocument
     this.options = options
     this.name = parser.parseCourseNameFromCoursePage(HTMLDocument, options)
+    this.number = parser.parseCourseNumberFromCoursePage(HTMLDocument)
     this.shortcut = parser.parseCourseShortcut(HTMLDocument, options)
     this.group = parser.parseCourseGroupFromCoursePage(HTMLDocument, link)
     this.isFirstScan = true

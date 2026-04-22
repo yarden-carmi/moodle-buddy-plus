@@ -97,6 +97,16 @@ function sendCollapsedProgress() {
   } satisfies ScanInProgressMessage)
 }
 
+// When two courses share the same name within the same group, append the
+// registrar's course number so download folders don't collide.
+function getDownloadCourseName(course: Course): string {
+  const duplicates = courses.filter(
+    (c) => c.name === course.name && c.group === course.group
+  )
+  if (duplicates.length <= 1) return course.name
+  return course.number ? `${course.name} (${course.number})` : course.name
+}
+
 function courseToDashboardCourseData(course: Course): DashboardCourseData {
   return {
     name: course.name,
@@ -377,7 +387,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
       command: COMMANDS.DOWNLOAD,
       id,
       courseLink: course.link,
-      courseName: course.name,
+      courseName: getDownloadCourseName(course),
       courseShortcut: course.shortcut,
       courseGroup: course.group,
       resources: downloadNodes,
@@ -421,7 +431,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
       command: COMMANDS.DOWNLOAD,
       id,
       courseLink: course.link,
-      courseName: course.name,
+      courseName: getDownloadCourseName(course),
       courseShortcut: course.shortcut,
       courseGroup: course.group,
       resources: downloadResources,
