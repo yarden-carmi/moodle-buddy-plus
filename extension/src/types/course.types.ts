@@ -1,5 +1,5 @@
 export type ResourceTypes = FileResourceTypes | "folder" | "assignment" | "activity"
-export type FileResourceTypes = "file" | "pluginfile" | "url" | "videoservice" | "zoom" | "sidebar-video" | "embedded-video"
+export type FileResourceTypes = "file" | "pluginfile" | "url" | "url-bookmark" | "videoservice" | "zoom" | "sidebar-video" | "embedded-video"
 
 export interface Resource {
   href: string

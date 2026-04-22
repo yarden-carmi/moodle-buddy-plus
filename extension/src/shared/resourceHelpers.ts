@@ -1,7 +1,7 @@
 import { Resource } from "@types"
 
 export function isFile(resource: Resource) {
-  return ["file", "pluginfile", "url"].includes(resource.type)
+  return ["file", "pluginfile", "url", "url-bookmark"].includes(resource.type)
 }
 
 export function isZoomRecording(resource: Resource) {

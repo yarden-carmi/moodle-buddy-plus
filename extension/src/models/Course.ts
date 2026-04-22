@@ -167,37 +167,25 @@ class Course {
     const addedAsZoom = await this.addZoomRecordingFromURLNode(node)
     if (addedAsZoom) return
 
-    // Make sure URL is a downloadable file
-    const activityIcon: HTMLImageElement | null = node.querySelector("img.activityicon")
-    if (activityIcon) {
-      const imgName = activityIcon.src.split("/").pop()
-      if (imgName) {
-        // "icon" image is usually used for websites but I can't download full websites
-        // Only support external URLs when they point to a file
-        const isFile = imgName !== "icon"
-        if (isFile) {
-          // File has been identified as downloadable
-          const href = parser.parseURLFromNode(node, "url", this.options)
-          if (href === "") return
+    // Persist URL activities as `.txt` bookmarks (resolved at download time).
+    const href = parser.parseURLFromNode(node, "url", this.options)
+    if (href === "") return
 
-          const section = parser.parseSectionName(node, this.HTMLDocument, this.options)
-          const sectionIndex = this.getSectionIndex(section)
-          const resourceNode: FileResource = {
-            href,
-            name: parser.parseFileNameFromNode(node),
-            section,
-            type: "url",
-            isNew: false,
-            isUpdated: false,
-            resourceIndex: this.resources.length + 1,
-            sectionIndex,
-            lastModified: await getLastModifiedHeader(href, this.options),
-          }
-
-          this.addResource(resourceNode)
-        }
-      }
+    const section = parser.parseSectionName(node, this.HTMLDocument, this.options)
+    const sectionIndex = this.getSectionIndex(section)
+    const resourceNode: FileResource = {
+      href,
+      name: parser.parseFileNameFromNode(node),
+      section,
+      type: "url-bookmark",
+      isNew: false,
+      isUpdated: false,
+      resourceIndex: this.resources.length + 1,
+      sectionIndex,
+      lastModified: await getLastModifiedHeader(href, this.options),
     }
+
+    this.addResource(resourceNode)
   }
 
   private static readonly ZOOM_RECORDING_REGEX = /https?:\/\/[^/]*zoom\.[^/]+\/rec\/(share|play)\//i

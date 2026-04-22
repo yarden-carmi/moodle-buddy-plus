@@ -226,7 +226,7 @@ class Downloader {
 
   async onInterrupted(id: number) {
     const [item] = await chrome.downloads.search({ id })
-    logger.error(`Download interrupted: "${item?.filename ?? id}" reason: ${item?.error ?? "unknown"}`)
+    logger.error(`Download interrupted: "${item?.filename ?? id}" url: ${item?.url ?? "unknown"} reason: ${item?.error ?? "unknown"}`)
     this.errorCount++
     this.fileCount--
     this.inProgress.delete(id)
@@ -260,6 +260,9 @@ class Downloader {
             break
           case "pluginfile":
             await this.downloadPluginFile(r as FileResource)
+            break
+          case "url-bookmark":
+            await this.downloadURLBookmark(r as FileResource)
             break
           case "folder":
             await this.downloadFolder(r as FolderResource)
@@ -452,6 +455,48 @@ class Downloader {
     }
 
     this.downloadLimit(startDownload)
+  }
+
+  private async downloadURLBookmark(resource: FileResource) {
+    if (this.isCancelled) return
+
+    let res: Response
+    try {
+      res = await fetch(resource.href, { credentials: "include" })
+    } catch (err) {
+      console.error(`[MB] Failed to fetch URL bookmark "${resource.name}":`, err)
+      await this.onError()
+      return
+    }
+
+    let targetUrl = ""
+    try {
+      const body = await res.text()
+      const { document } = parseHTML(body)
+      const linkEl = document.querySelector(
+        ".urlworkaround a[href], .resourcecontent a[href]"
+      ) as HTMLAnchorElement | null
+      targetUrl = linkEl?.getAttribute("href")?.trim() ?? ""
+    } catch (err) {
+      console.error(`[MB] Failed to parse URL bookmark "${resource.name}":`, err)
+    }
+
+    if (targetUrl === "") {
+      await this.onError()
+      return
+    }
+
+    // If the target stays inside Moodle, treat it as a regular file resource
+    // so the existing pluginfile/embed resolution path can handle it.
+    const moodleBase = getMoodleBaseURL(res.url)
+    if (targetUrl.startsWith(moodleBase)) {
+      await this.downloadFile(resource)
+      return
+    }
+
+    const dataUrl = `data:text/plain;charset=utf-8,${encodeURIComponent(targetUrl)}`
+    const fileName = `${sanitizeFileName(resource.name) || "bookmark"}.txt`
+    await this.download(dataUrl, fileName, resource)
   }
 
   private async downloadPluginFile(resource: FileResource) {
