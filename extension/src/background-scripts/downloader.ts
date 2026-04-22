@@ -20,6 +20,7 @@ import { isDebug, isFirefox } from "@shared/helpers"
 
 import {
   parseFileNameFromPluginFileURL,
+  parseFolderRelativePathFromPluginFileURL,
   parseAssignmentNameFromPage,
   getDownloadButton,
   getDownloadIdTag,
@@ -336,7 +337,11 @@ class Downloader {
     // Remove illegal characters from possible filename parts
     const cleanCourseShortcut = sanitizeFileName(this.courseShortcut, "_") || "Unknown Shortcut"
     const cleanCourseName = sanitizeFileName(this.courseName, "") || "Unknown Course"
-    const cleanSectionName = sanitizeFileName(section)
+    const cleanSectionName = section
+      .split("{slash}")
+      .map((s) => sanitizeFileName(s))
+      .filter((s) => s !== "")
+      .join("/")
     const cleanFileName = sanitizeFileName(fileName).replace(/\{slash\}/g, "/")
 
     let filePath = cleanFileName
@@ -593,8 +598,11 @@ class Downloader {
 
       const cleanFolderName = sanitizeFileName(name)
       for (const fileNode of Array.from(fileNodes)) {
-        const URLFileName = parseFileNameFromPluginFileURL(fileNode.href)
-        const fileName = `${cleanFolderName}{slash}${URLFileName}`
+        const relativePath = parseFolderRelativePathFromPluginFileURL(fileNode.href)
+        const innerPath = relativePath
+          ? relativePath.split("/").map((s) => sanitizeFileName(s)).filter(Boolean).join("{slash}")
+          : sanitizeFileName(parseFileNameFromPluginFileURL(fileNode.href))
+        const fileName = `${cleanFolderName}{slash}${innerPath}`
         await this.download(fileNode.href, fileName, resource)
       }
     }
