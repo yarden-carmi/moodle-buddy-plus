@@ -1,98 +1,113 @@
-<p style="display: flex; flex-direction: column; align-items: center;">
-   <h2 align="center">Moodle Buddy+</h2>
-   <p style="width: 600px; margin: auto; text-align: center;">
-      Moodle Buddy+ offers mass file download and notification functionality for the Moodle learning management platform. Students can download all learning materials with just one click and see updates to their courses immediately.
-   </p>
-</p>
+# Moodle Buddy+
 
-## Installation
+Mass file download and update notifications for Moodle. Pull every resource in a course with one click, get notified when new material appears, and keep everything organised on disk.
 
-The plugin is available for both **Chrome** and **Firefox**.
+A maintained fork of the original Moodle Buddy, with bug fixes and additions for modern Moodle versions.
+
+## Install
+
+Available for **Chrome** and **Firefox**.
 
 ## Usage
 
-1. Log into your university's Moodle system
-2. Visit any of the following Moodle webpages:
-   - Moodle Dashboard/Course Overview (URL ending on /my)
-   - Any Moodle course page (URL includes /course)
-   - Course activity pages (e.g. URL includes /mod/assign)
-   - Moodle video page (URL includes /videoservice)
-3. Click the Moodle Buddy+ icon in the extension bar of your browser
-4. Explore all the features Moodle Buddy+ has to offer
+1. Log into your university's Moodle.
+2. Open one of:
+   - the dashboard / course overview (URL ends in `/my`)
+   - any course page (URL contains `/course`)
+   - an activity page (e.g. `/mod/assign`)
+   - the Moodle video service (URL contains `/videoservice`)
+3. Click the Moodle Buddy+ icon in the browser toolbar.
 
-## Full Feature List
+## Features
 
-### Course Page
+### Course page
 
-- Download all course resources with one click
-- Scans single Moodle courses for new resources
-- Scans single Moodle courses for new activities (Assignment Uploads, Forums, etc.)
-- Shows you when new resources or activities have been detected
-- Download only new resources from a course
-- Filter downloadable resources for files and folders
-- Modify file names of the downloaded resources
+- One-click download of every resource in the course
+- Detects new resources and activities (assignment uploads, forums, …) since your last visit
+- Download only what's new, or filter by files / folders
+- Configurable folder structure and file-name format
 
 ### Dashboard
 
-- Shows updates (resources & activities) for all courses from the dashboard page
-- Download new resources directly from the dashboard page
-- Scans your courses in the background (if you are logged in) and notifies you if there are updates
+- Scans every course on the overview page and surfaces updates per course
+- Download a whole course (or just its new items) without leaving the dashboard
+- Optional background scan that notifies you when courses change while you're logged in
+- Group courses on disk by their dashboard category (FCL group)
+- When two courses share the same name in the same group, the registrar's course number is appended so each gets its own folder
 
-### Assignment Pages
+### Resources
 
-- Download assignment submission files directly
+- Folders are downloaded as a single zip per folder
+- Moodle URL bookmarks are saved as `.txt` files containing the resolved external link
 
-### Video Pages
+### Assignments & videos
 
-- Download embedded Zoom recordings
+- Download assignment submission files, graded files, and feedback comments
+- Download Moodle video service recordings and embedded Zoom recordings
 
-### Moodle Tiles Format
+### Other
 
-- Supports background fetching and parsing for Moodle Tiles-style courses
+- Supports the Moodle Tiles course format
 
-# Licensing
+## Licensing
 
-Usage of this codebase is permitted according to the GNU Affero General Public License v3 (AGPL-3.0).
+Released under the GNU Affero General Public License v3 (AGPL-3.0). **Read the [full license](LICENSE) before using.**
 
-**READ THE [FULL LICENSE](LICENSE) BEFORE USING.**
+You must:
 
-You MUST:
+- Respect the copyright held by the maintainers
+- Disclose any modifications and publish derivative code under the same license
+- Attribute the original maintainers, especially in commercial use
 
-- Respect the copyright which is held by the maintainers of this project
-- Disclose all changes you made to the code and also publish any code directly based on this code
-- Give attribution to the original maintainers when using this project (especially when used commercially)
-
-You can not:
+You may not:
 
 - Sublicense this codebase
-- Expect any liability, warranty or similar by the original maintainers. However, we want to improve this project as much as possible so feedback is heard!
+- Expect any liability or warranty from the maintainers (feedback is still very welcome)
 
-# For Developers
+## For developers
 
-All commands need to be run in the `extension` directory
+All commands run inside the `extension` directory.
 
-## Setup
-
-1. Install dependencies
+### Setup
 
 ```bash
 npm install
 ```
 
-## Development
+### Development
 
-1. Open one terminal and run `npm run dev`
-   - This runs webpack and reloads the bundle on every file change.
-2. Open a second terminal and run `npm start`
-   - This starts **Firefox Nightly** with the plugin installed and reloads the plugin on every file change.
-   - Alternatively, run `npm run start:ff` to use regular Firefox
-   - If you want to use Chrome for the development you can load an unpacked extension pointing to the `build` directory. Make sure to reload the extension after every file change.
+In one terminal:
 
-## Debugging
+```bash
+npm run dev          # webpack watch, Firefox build
+# or
+npm run dev:chrome   # webpack watch, Chrome build
+```
 
-- When using Firefox I suggest opening the _Browser Console_ with the shortcut `CTRL + Shift + J`
-- Make sure to click the Cog Icon and enable _Show Content Messages_. This makes the log statements from the code show up in the console.
+In a second terminal:
 
-## Build
+```bash
+npm start            # Firefox Nightly with the extension auto-loaded
+# or
+npm run start:ff     # regular Firefox
+```
 
-1. `npm run build`
+For Chrome, load `extension/build/` as an unpacked extension at `chrome://extensions` and click reload after each change.
+
+### Debugging
+
+- Firefox: open the **Browser Console** (`Ctrl + Shift + J`) and enable *Show Content Messages* from the cog menu so content-script logs appear.
+- Chrome: inspect the popup, the options page, and the service worker from `chrome://extensions`.
+
+### Build
+
+```bash
+npm run build:chrome
+npm run build:ff
+```
+
+Production zips are written to `extension/moodle-buddy-plus-<target>.zip`.
+
+## Issues
+
+Bug reports and feature requests: <https://github.com/yarden-carmi/moodle-buddy-plus/issues>

@@ -3,14 +3,21 @@ import {
   DashboardDownloadCourseMessage,
   DashboardScanResultMessage,
   DownloadMessage,
+  DownloadProgressMessage,
   MarkAsSeenMessage,
   Message,
   ScanInProgressMessage,
   ExtensionStorage,
-  DownloadProgressMessage,
   DashboardUpdateCourseMessage,
   DashboardCourseData,
+  Resource,
 } from "types"
+import {
+  isZoomRecording,
+  isVideoServiceVideo,
+  isSidebarVideo,
+  isEmbeddedVideo,
+} from "@shared/resourceHelpers"
 import { checkForMoodle, parseCourseLink } from "@shared/parser"
 import { updateIconFromCourses, isDebug, getCourseDownloadId } from "@shared/helpers"
 import Course from "../models/Course"
@@ -18,20 +25,43 @@ import { getURLRegex } from "@shared/regexHelpers"
 import logger from "@shared/logger"
 import { COMMANDS } from "@shared/constants"
 
+const SCAN_CONCURRENCY = 5
+
+function stripVideoResources(resources: Resource[]): Resource[] {
+  return resources.filter(
+    (r) =>
+      !isZoomRecording(r) && !isVideoServiceVideo(r) && !isSidebarVideo(r) && !isEmbeddedVideo(r)
+  )
+}
+
+function sendPendingProgress(course: Course, id: string) {
+  chrome.runtime.sendMessage({
+    command: COMMANDS.DOWNLOAD_PROGRESS,
+    id,
+    courseLink: course.link,
+    courseName: course.name,
+    errors: 0,
+    total: 0,
+    completed: 0,
+    isDone: false,
+    isPending: true,
+  } satisfies DownloadProgressMessage)
+}
+
 let error = false
 let scanInProgress = true
 let scanTotal = 0
 let scanCompleted = 0
+let collapsedTotal = 0
+let collapsedCompleted = 0
 let courses: Course[] = []
+const scannedLinks = new Set<string>()
+const courseGroups = new Map<string, string>() // link → FCL group label
 let lastSettingsHash = ""
-let downloadState: Record<string, DownloadProgressMessage> = {}
 
 function getOverviewSettings() {
   const settingsDiv: HTMLElement | null = document.querySelector("[data-region='courses-view']")
-  if (settingsDiv) {
-    return settingsDiv.dataset
-  }
-
+  if (settingsDiv) return settingsDiv.dataset
   return null
 }
 
@@ -41,12 +71,40 @@ function hasHiddenParent(element: HTMLElement): boolean {
   return element.parentElement !== null && hasHiddenParent(element.parentElement)
 }
 
+function safeSend(message: object) {
+  try {
+    chrome.runtime.sendMessage(message)
+  } catch {
+    // Extension context invalidated (e.g. reloaded during scan) — ignore
+  }
+}
+
 function sendScanProgress() {
-  chrome.runtime.sendMessage({
+  safeSend({
     command: COMMANDS.SCAN_IN_PROGRESS,
     completed: scanCompleted,
     total: scanTotal,
   } satisfies ScanInProgressMessage)
+}
+
+function sendCollapsedProgress() {
+  safeSend({
+    command: COMMANDS.SCAN_IN_PROGRESS,
+    completed: scanCompleted,
+    total: scanTotal,
+    collapsedCompleted,
+    collapsedTotal,
+  } satisfies ScanInProgressMessage)
+}
+
+// When two courses share the same name within the same group, append the
+// registrar's course number so download folders don't collide.
+function getDownloadCourseName(course: Course): string {
+  const duplicates = courses.filter(
+    (c) => c.name === course.name && c.group === course.group
+  )
+  if (duplicates.length <= 1) return course.name
+  return course.number ? `${course.name} (${course.number})` : course.name
 }
 
 function courseToDashboardCourseData(course: Course): DashboardCourseData {
@@ -54,16 +112,59 @@ function courseToDashboardCourseData(course: Course): DashboardCourseData {
     name: course.name,
     link: course.link,
     isNew: course.isFirstScan,
+    isCollapsed: !scannedLinks.has(course.link),
     resources: course.resources,
     activities: course.activities,
+    group: courseGroups.get(course.link),
   } satisfies DashboardCourseData
 }
 
 function sendScanResults() {
-  chrome.runtime.sendMessage({
+  safeSend({
     command: COMMANDS.SCAN_RESULT,
     courses: courses.map(courseToDashboardCourseData),
   } satisfies DashboardScanResultMessage)
+}
+
+async function fetchWithRetry(url: string, retries = 2, delayMs = 1000): Promise<Response> {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fetch(url)
+    } catch (err) {
+      if (attempt === retries) throw err
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+  }
+  throw new Error("unreachable")
+}
+
+async function runParallel<T>(
+  items: T[],
+  fn: (item: T) => Promise<void>,
+  limit = SCAN_CONCURRENCY
+): Promise<void> {
+  const queue = [...items]
+  await Promise.all(
+    Array.from({ length: Math.min(limit, queue.length) || 1 }, async () => {
+      while (queue.length > 0) {
+        const item = queue.shift()!
+        await fn(item)
+      }
+    })
+  )
+}
+
+// If a course was fetched for name only (Phase 2), scan it in-place using the stored HTMLDocument.
+async function ensureCourseScanned(link: string): Promise<Course> {
+  const course = courses.find((c) => c.link === link)
+  if (!course) throw new Error(`Course not found: ${link}`)
+  if (!scannedLinks.has(link)) {
+    const { options } = (await chrome.storage.local.get("options")) as ExtensionStorage
+    course.options = options
+    await course.scan()
+    scannedLinks.add(link)
+  }
+  return course
 }
 
 async function scanOverview(retry = 0) {
@@ -72,27 +173,27 @@ async function scanOverview(retry = 0) {
     scanInProgress = true
     scanTotal = 0
     scanCompleted = 0
+    collapsedTotal = 0
+    collapsedCompleted = 0
     courses = []
+    scannedLinks.clear()
+    courseGroups.clear()
 
     const { options } = (await chrome.storage.local.get("options")) as ExtensionStorage
     let courseLinks: string[] = []
+    const collapsedLinks: string[] = []
 
     sendScanProgress()
 
-    // Sleep some time to wait for full page load
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await new Promise((resolve) => setTimeout(resolve, retry === 0 ? 500 : 2000))
 
-    // Save hash of settings to check for changes
     lastSettingsHash = shajs("sha224").update(JSON.stringify(getOverviewSettings())).digest("hex")
 
     let useFallback = false
 
-    // Try to use the overview node to find courses
-    // If something goes wrong use fallback
     const overviewNode = document.querySelector("[data-region='myoverview']")
     if (overviewNode) {
       const courseNodes = overviewNode.querySelectorAll("[data-region='course-content']")
-
       if (courseNodes.length !== 0) {
         courseLinks = Array.from(courseNodes).map((n) => parseCourseLink(n.innerHTML))
       } else {
@@ -104,66 +205,113 @@ async function scanOverview(retry = 0) {
 
     useFallback = true
     if (useFallback) {
+      const coursePageRegex = getURLRegex("course")
       const searchRoot = document.querySelector("#region-main")
       if (searchRoot) {
-        const coursePageRegex = getURLRegex("course")
-        courseLinks = Array.from(searchRoot.querySelectorAll("a"))
+        courseLinks = Array.from(searchRoot.querySelectorAll<HTMLAnchorElement>("a"))
           .filter((n) => n.href.match(coursePageRegex) && !hasHiddenParent(n))
           .map((n) => n.href)
       }
+
+      if (courseLinks.length === 0) {
+        const fclPanels = document.querySelectorAll<HTMLElement>(".block-fcl__list")
+        if (fclPanels.length > 0) {
+          fclPanels.forEach((panel) => {
+            const isCollapsed = panel.getAttribute("aria-hidden") === "true"
+            const tabId = panel.getAttribute("aria-labelledby")
+            const groupLabel = tabId
+              ? document.getElementById(tabId)?.textContent?.trim() ?? ""
+              : ""
+
+            panel.querySelectorAll<HTMLAnchorElement>("a").forEach((a) => {
+              if (!a.href.match(coursePageRegex)) return
+              courseGroups.set(a.href, groupLabel)
+              if (isCollapsed) {
+                collapsedLinks.push(a.href)
+              } else {
+                courseLinks.push(a.href)
+              }
+            })
+          })
+        } else {
+          courseLinks = Array.from(document.body.querySelectorAll<HTMLAnchorElement>("a"))
+            .filter((n) => n.href.match(coursePageRegex))
+            .map((n) => n.href)
+        }
+      }
     }
 
-    if (courseLinks.length === 0) {
-      // No courses found
+    if (courseLinks.length === 0 && collapsedLinks.length === 0) {
       if (retry < maxRetries) {
-        // Retry once more because maybe the page was not fully loaded
         logger.info("No course found in dashboard. Retrying once more...")
         scanOverview(retry + 1)
         return
       }
     } else {
-      // Remove duplicates
-      courseLinks = Array.from(new Set(courseLinks))
-      // Apply maxCoursesOnDashboardPage option
-      courseLinks = courseLinks.slice(0, options.maxCoursesOnDashboardPage)
+      // Deduplicate
+      const uniqueVisible = Array.from(new Set(courseLinks))
+      const uniqueCollapsed = Array.from(new Set(collapsedLinks)).filter(
+        (l) => !uniqueVisible.includes(l)
+      )
 
-      scanTotal = courseLinks.length
+      const visibleLinks = uniqueVisible.slice(0, options.maxCoursesOnDashboardPage)
+      scanTotal = visibleLinks.length
 
       if (isDebug) {
-        logger.debug(courseLinks)
+        logger.debug({ visibleLinks, collapsedLinks: uniqueCollapsed })
         return
       }
 
       const domParser = new DOMParser()
-      for (const link of courseLinks) {
+
+      // Phase 1: scan visible (expanded) courses fully
+      await runParallel(visibleLinks, async (link) => {
         try {
-          const res = await fetch(link)
-
+          const res = await fetchWithRetry(link)
           if (link !== res.url) {
-            // Skipping unexpected resolved link because sometimes there can be a redirect to other Moodle pages
-            continue
+            scanTotal--
+            sendScanProgress()
+            return
           }
-
-          const resBody = await res.text()
-          const HTMLDocument = domParser.parseFromString(resBody, "text/html")
-
-          const course = new Course(link, HTMLDocument, options)
+          const doc = domParser.parseFromString(await res.text(), "text/html")
+          const course = new Course(link, doc, options)
           await course.scan()
+          scannedLinks.add(link)
           courses.push(course)
           scanCompleted++
         } catch (err) {
           scanTotal--
-          error = true
-          logger.error(err)
+          logger.warn(err)
         }
         sendScanProgress()
-      }
+      })
+
+      // Phase 2: fetch collapsed courses for name only (no resource scan)
+      collapsedTotal = uniqueCollapsed.length
+      await runParallel(uniqueCollapsed, async (link) => {
+        try {
+          const res = await fetchWithRetry(link)
+          if (link !== res.url) {
+            collapsedTotal--
+            sendCollapsedProgress()
+            return
+          }
+          const doc = domParser.parseFromString(await res.text(), "text/html")
+          const collapsedCourse = new Course(link, doc, options)
+          courses.push(collapsedCourse)
+          collapsedCompleted++
+        } catch (err) {
+          collapsedTotal--
+          logger.warn(err)
+        }
+        sendCollapsedProgress()
+      })
 
       chrome.storage.local.set({
         overviewCourseLinks: courses.map((c) => c.link),
       } satisfies Partial<ExtensionStorage>)
 
-      updateIconFromCourses(courses)
+      updateIconFromCourses(courses.filter((c) => scannedLinks.has(c.link)))
     }
 
     scanInProgress = false
@@ -180,21 +328,12 @@ if (isMoodlePage) {
   scanOverview()
 }
 
-function getCourseByLink(link: string): Course {
-  const course = courses.find((c) => c.link === link)
-  if (!course) {
-    throw new Error(`Course with link ${link} is undefined`)
-  }
-  return course
-}
-
 chrome.runtime.onMessage.addListener(async (message: Message) => {
   const { command } = message
+
   if (command === COMMANDS.INIT_SCAN) {
     if (error) {
-      chrome.runtime.sendMessage({
-        command: COMMANDS.ERROR_VIEW,
-      } satisfies Message)
+      chrome.runtime.sendMessage({ command: COMMANDS.ERROR_VIEW } satisfies Message)
       return
     }
 
@@ -202,9 +341,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
       sendScanProgress()
     } else {
       if (error) {
-        chrome.runtime.sendMessage({
-          command: COMMANDS.ERROR_VIEW,
-        } satisfies Message)
+        chrome.runtime.sendMessage({ command: COMMANDS.ERROR_VIEW } satisfies Message)
         return
       }
 
@@ -213,16 +350,12 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
         .digest("hex")
 
       if (currentSettingsHash !== lastSettingsHash) {
-        // User has modified the overview -> Repeat the scan
         lastSettingsHash = currentSettingsHash
         scanOverview()
         return
       }
 
-      if (courses.length === 0) {
-        logger.info("empty dashboard")
-      }
-
+      if (courses.length === 0) logger.info("empty dashboard")
       sendScanResults()
     }
     return
@@ -231,45 +364,41 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
   if (command === COMMANDS.MARK_AS_SEEN) {
     const { link } = message as MarkAsSeenMessage
     const course = courses.find((c) => c.link === link)
-
     if (course === undefined) {
       logger.error(`Course with link ${link} is undefined. Failed to process message.`, message)
       return
     }
-
-    // Update course
     await course.updateStoredResources()
     await course.updateStoredActivities()
     await course.scan()
-    updateIconFromCourses(courses)
+    updateIconFromCourses(courses.filter((c) => scannedLinks.has(c.link)))
   }
 
   if (command === COMMANDS.DASHBOARD_DOWNLOAD_NEW) {
     const { link } = message as DashboardDownloadCourseMessage
-    const course = getCourseByLink(link)
-
+    const id = getCourseDownloadId(command, { link } as Course)
+    const placeholderCourse = courses.find((c) => c.link === link)
+    if (placeholderCourse) sendPendingProgress(placeholderCourse, id)
+    const course = await ensureCourseScanned(link)
     const { options } = (await chrome.storage.local.get("options")) as ExtensionStorage
-
-    // Only download new resources
-    const downloadNodes = course.resources.filter((r) => r.isNew)
+    const downloadNodes = stripVideoResources(course.resources.filter((r) => r.isNew))
 
     chrome.runtime.sendMessage({
       command: COMMANDS.DOWNLOAD,
-      id: getCourseDownloadId(command, course),
+      id,
       courseLink: course.link,
-      courseName: course.name,
+      courseName: getDownloadCourseName(course),
       courseShortcut: course.shortcut,
+      courseGroup: course.group,
       resources: downloadNodes,
       options,
     } satisfies DownloadMessage)
 
-    // Update course
     await course.updateStoredResources(downloadNodes)
     await course.updateStoredActivities()
     await course.scan()
-    updateIconFromCourses(courses)
+    updateIconFromCourses(courses.filter((c) => scannedLinks.has(c.link)))
 
-    // Send request for an update only after timeout to allow the downloader to send the first progress message
     setTimeout(() => {
       chrome.runtime.sendMessage({
         command: COMMANDS.DASHBOARD_UPDATE_COURSE,
@@ -279,29 +408,39 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
   }
 
   if (command === COMMANDS.ENSURE_CORRECT_BADGE) {
-    updateIconFromCourses(courses)
+    updateIconFromCourses(courses.filter((c) => scannedLinks.has(c.link)))
   }
 
   if (command === COMMANDS.DASHBOARD_DOWNLOAD_COURSE) {
     const { options } = (await chrome.storage.local.get("options")) as ExtensionStorage
-    const { link } = message as DashboardDownloadCourseMessage
-    const course = getCourseByLink(link)
-
-    const id = getCourseDownloadId(command, course)
+    const { link, includeSeen } = message as DashboardDownloadCourseMessage
+    const placeholderCourse = courses.find((c) => c.link === link)
+    const id = placeholderCourse
+      ? getCourseDownloadId(command, placeholderCourse)
+      : getCourseDownloadId(command, { link } as Course)
+    if (placeholderCourse) sendPendingProgress(placeholderCourse, id)
+    const wasCollapsed = !scannedLinks.has(link)
+    const course = await ensureCourseScanned(link)
+    const filteredByNew =
+      wasCollapsed && !includeSeen
+        ? course.resources.filter((r) => r.isNew || r.isUpdated)
+        : course.resources
+    const downloadResources = stripVideoResources(filteredByNew)
 
     chrome.runtime.sendMessage({
       command: COMMANDS.DOWNLOAD,
       id,
       courseLink: course.link,
-      courseName: course.name,
+      courseName: getDownloadCourseName(course),
       courseShortcut: course.shortcut,
-      resources: course.resources,
+      courseGroup: course.group,
+      resources: downloadResources,
       options,
     } satisfies DownloadMessage)
 
     await course.updateStoredResources(course.resources)
     await course.updateStoredActivities()
     await course.scan()
-    updateIconFromCourses(courses)
+    updateIconFromCourses(courses.filter((c) => scannedLinks.has(c.link)))
   }
 })

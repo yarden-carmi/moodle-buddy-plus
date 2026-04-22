@@ -85,7 +85,14 @@
     </div>
 
     <div v-else class="mt-1 text-xs text-gray-600">
-      <div v-if="course.isNew">
+      <div v-if="course.isCollapsed">
+        Course tab not expanded — open the tab to see updates.
+        <label class="flex items-center mt-1.5 cursor-pointer">
+          <input type="checkbox" v-model="includeSeen" class="mr-1" />
+          <span>Include already-seen resources</span>
+        </label>
+      </div>
+      <div v-else-if="course.isNew">
         Scanned for the first time.
         <br />
         Updates will be shown on your next visit.
@@ -133,6 +140,7 @@ const emit = defineEmits<{
 }>()
 
 const showDetails = ref(false)
+const includeSeen = ref(false)
 
 const newResources = computed(() => props.course.resources.filter((n) => n.isNew))
 const newActivities = computed(() => props.course.activities.filter((n) => n.isNew))
@@ -171,6 +179,7 @@ function onDownloadCourse() {
     chrome.tabs.sendMessage(activeTab.value.id, {
       command: COMMANDS.DASHBOARD_DOWNLOAD_COURSE,
       link: props.course.link,
+      includeSeen: includeSeen.value,
     } satisfies DashboardDownloadCourseMessage)
   }
 }

@@ -20,6 +20,7 @@ import { isDebug, isFirefox } from "@shared/helpers"
 
 import {
   parseFileNameFromPluginFileURL,
+  parseFolderRelativePathFromPluginFileURL,
   parseAssignmentNameFromPage,
   getDownloadButton,
   getDownloadIdTag,
@@ -115,6 +116,7 @@ class Downloader {
   courseLink: string
   courseName: string
   courseShortcut: string
+  courseGroup: string
   resources: Resource[]
   options: ExtensionOptions
 
@@ -139,6 +141,7 @@ class Downloader {
     courseLink: string,
     courseName: string,
     courseShortcut: string,
+    courseGroup: string,
     resources: Resource[],
     options: ExtensionOptions
   ) {
@@ -146,6 +149,7 @@ class Downloader {
     this.courseLink = courseLink
     this.courseName = courseName
     this.courseShortcut = courseShortcut
+    this.courseGroup = courseGroup
     this.resources = resources
     this.options = options
 
@@ -222,7 +226,7 @@ class Downloader {
 
   async onInterrupted(id: number) {
     const [item] = await chrome.downloads.search({ id })
-    logger.error(`Download interrupted: "${item?.filename ?? id}" reason: ${item?.error ?? "unknown"}`)
+    logger.error(`Download interrupted: "${item?.filename ?? id}" url: ${item?.url ?? "unknown"} reason: ${item?.error ?? "unknown"}`)
     this.errorCount++
     this.fileCount--
     this.inProgress.delete(id)
@@ -256,6 +260,9 @@ class Downloader {
             break
           case "pluginfile":
             await this.downloadPluginFile(r as FileResource)
+            break
+          case "url-bookmark":
+            await this.downloadURLBookmark(r as FileResource)
             break
           case "folder":
             await this.downloadFolder(r as FolderResource)
@@ -333,7 +340,11 @@ class Downloader {
     // Remove illegal characters from possible filename parts
     const cleanCourseShortcut = sanitizeFileName(this.courseShortcut, "_") || "Unknown Shortcut"
     const cleanCourseName = sanitizeFileName(this.courseName, "") || "Unknown Course"
-    const cleanSectionName = sanitizeFileName(section)
+    const cleanSectionName = section
+      .split("{slash}")
+      .map((s) => sanitizeFileName(s))
+      .filter((s) => s !== "")
+      .join("/")
     const cleanFileName = sanitizeFileName(fileName).replace(/\{slash\}/g, "/")
 
     let filePath = cleanFileName
@@ -398,6 +409,13 @@ class Downloader {
         break
     }
 
+    if (this.options.groupSubfolder && this.courseGroup) {
+      const cleanGroup = sanitizeFileName(this.courseGroup)
+      if (cleanGroup !== "") {
+        filePath = `${cleanGroup}/${filePath}`
+      }
+    }
+
     if (this.options.saveToMoodleFolder) {
       filePath = `Moodle/${filePath}`
     }
@@ -437,6 +455,48 @@ class Downloader {
     }
 
     this.downloadLimit(startDownload)
+  }
+
+  private async downloadURLBookmark(resource: FileResource) {
+    if (this.isCancelled) return
+
+    let res: Response
+    try {
+      res = await fetch(resource.href, { credentials: "include" })
+    } catch (err) {
+      console.error(`[MB] Failed to fetch URL bookmark "${resource.name}":`, err)
+      await this.onError()
+      return
+    }
+
+    let targetUrl = ""
+    try {
+      const body = await res.text()
+      const { document } = parseHTML(body)
+      const linkEl = document.querySelector(
+        ".urlworkaround a[href], .resourcecontent a[href]"
+      ) as HTMLAnchorElement | null
+      targetUrl = linkEl?.getAttribute("href")?.trim() ?? ""
+    } catch (err) {
+      console.error(`[MB] Failed to parse URL bookmark "${resource.name}":`, err)
+    }
+
+    if (targetUrl === "") {
+      await this.onError()
+      return
+    }
+
+    // If the target stays inside Moodle, treat it as a regular file resource
+    // so the existing pluginfile/embed resolution path can handle it.
+    const moodleBase = getMoodleBaseURL(res.url)
+    if (targetUrl.startsWith(moodleBase)) {
+      await this.downloadFile(resource)
+      return
+    }
+
+    const dataUrl = `data:text/plain;charset=utf-8,${encodeURIComponent(targetUrl)}`
+    const fileName = `${sanitizeFileName(resource.name) || "bookmark"}.txt`
+    await this.download(dataUrl, fileName, resource)
   }
 
   private async downloadPluginFile(resource: FileResource) {
@@ -583,8 +643,11 @@ class Downloader {
 
       const cleanFolderName = sanitizeFileName(name)
       for (const fileNode of Array.from(fileNodes)) {
-        const URLFileName = parseFileNameFromPluginFileURL(fileNode.href)
-        const fileName = `${cleanFolderName}{slash}${URLFileName}`
+        const relativePath = parseFolderRelativePathFromPluginFileURL(fileNode.href)
+        const innerPath = relativePath
+          ? relativePath.split("/").map((s) => sanitizeFileName(s)).filter(Boolean).join("{slash}")
+          : sanitizeFileName(parseFileNameFromPluginFileURL(fileNode.href))
+        const fileName = `${cleanFolderName}{slash}${innerPath}`
         await this.download(fileNode.href, fileName, resource)
       }
     }
@@ -844,7 +907,7 @@ async function onCancel() {
 }
 
 async function onDownload(message: DownloadMessage) {
-  const { id, courseLink, courseName, courseShortcut, resources, options: userOptions } = message
+  const { id, courseLink, courseName, courseShortcut, courseGroup, resources, options: userOptions } = message
   logger.debug(`Received download message with id ${id}`)
 
   if (downloaders[id]) {
@@ -858,7 +921,7 @@ async function onDownload(message: DownloadMessage) {
   const options = { ...storageOptions, ...userOptions }
 
   // Create and register the downloader
-  const downloader = new Downloader(id, courseLink, courseName, courseShortcut, resources, options)
+  const downloader = new Downloader(id, courseLink, courseName, courseShortcut, courseGroup ?? "", resources, options)
   downloaders[downloader.id] = downloader
 }
 

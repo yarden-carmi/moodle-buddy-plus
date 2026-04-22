@@ -18,11 +18,12 @@ import logger from "@shared/logger"
 async function getLastModifiedHeader(href: string, options: ExtensionOptions) {
   if (!options.detectFileUpdates) return
 
-  const headResponse = await fetch(href, {
-    method: "HEAD",
-  })
-  const lastModified = headResponse.headers.get("last-modified")
-  return lastModified ?? undefined
+  try {
+    const headResponse = await fetch(href, { method: "HEAD" })
+    return headResponse.headers.get("last-modified") ?? undefined
+  } catch {
+    return undefined
+  }
 }
 
 const courseURLRegex = getURLRegex("course")
@@ -32,7 +33,9 @@ class Course {
   link: string
   HTMLDocument: Document
   name: string
+  number: string
   shortcut: string
+  group: string
   isFirstScan: boolean
   isCoursePage: boolean
   options: ExtensionOptions
@@ -52,7 +55,9 @@ class Course {
     this.HTMLDocument = HTMLDocument
     this.options = options
     this.name = parser.parseCourseNameFromCoursePage(HTMLDocument, options)
+    this.number = parser.parseCourseNumberFromCoursePage(HTMLDocument)
     this.shortcut = parser.parseCourseShortcut(HTMLDocument, options)
+    this.group = parser.parseCourseGroupFromCoursePage(HTMLDocument, link)
     this.isFirstScan = true
     this.isCoursePage = !!link.match(courseURLRegex)
 
@@ -164,37 +169,25 @@ class Course {
     const addedAsZoom = await this.addZoomRecordingFromURLNode(node)
     if (addedAsZoom) return
 
-    // Make sure URL is a downloadable file
-    const activityIcon: HTMLImageElement | null = node.querySelector("img.activityicon")
-    if (activityIcon) {
-      const imgName = activityIcon.src.split("/").pop()
-      if (imgName) {
-        // "icon" image is usually used for websites but I can't download full websites
-        // Only support external URLs when they point to a file
-        const isFile = imgName !== "icon"
-        if (isFile) {
-          // File has been identified as downloadable
-          const href = parser.parseURLFromNode(node, "url", this.options)
-          if (href === "") return
+    // Persist URL activities as `.txt` bookmarks (resolved at download time).
+    const href = parser.parseURLFromNode(node, "url", this.options)
+    if (href === "") return
 
-          const section = parser.parseSectionName(node, this.HTMLDocument, this.options)
-          const sectionIndex = this.getSectionIndex(section)
-          const resourceNode: FileResource = {
-            href,
-            name: parser.parseFileNameFromNode(node),
-            section,
-            type: "url",
-            isNew: false,
-            isUpdated: false,
-            resourceIndex: this.resources.length + 1,
-            sectionIndex,
-            lastModified: await getLastModifiedHeader(href, this.options),
-          }
-
-          this.addResource(resourceNode)
-        }
-      }
+    const section = parser.parseSectionName(node, this.HTMLDocument, this.options)
+    const sectionIndex = this.getSectionIndex(section)
+    const resourceNode: FileResource = {
+      href,
+      name: parser.parseFileNameFromNode(node),
+      section,
+      type: "url-bookmark",
+      isNew: false,
+      isUpdated: false,
+      resourceIndex: this.resources.length + 1,
+      sectionIndex,
+      lastModified: await getLastModifiedHeader(href, this.options),
     }
+
+    this.addResource(resourceNode)
   }
 
   private static readonly ZOOM_RECORDING_REGEX = /https?:\/\/[^/]*zoom\.[^/]+\/rec\/(share|play)\//i

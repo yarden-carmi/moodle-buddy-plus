@@ -23,6 +23,7 @@ export interface ExtensionOptions {
   downloadFolderAsZip: boolean
   includeAssignmentSubmissionFiles: boolean
   saveToMoodleFolder: boolean
+  groupSubfolder: boolean
   folderStructure: FolderStructure
   includeVideo: boolean
   includeAudio: boolean

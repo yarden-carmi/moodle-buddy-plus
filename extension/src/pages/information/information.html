@@ -17,75 +17,65 @@
       </div>
 
       <div class="content-container">
-        <div class="section-title">How to use?</div>
+        <div class="section-title">How to use</div>
         <div class="section-content">
           <ol>
-            <li>Log into your university's Moodle system</li>
+            <li>Log into your university's Moodle.</li>
             <li>
-              <div>Visit any of the following Moodle webpages:</div>
+              <div>Open one of these pages:</div>
               <ul>
-                <li>Moodle Dashboard/Course Overview (URL ending on /my)</li>
-                <li>Any Moodle course page (URL includes /course)</li>
-                <li>Course activity pages (e.g. URL includes /mod/assign)</li>
-                <li>Moodle video page (URL includes /videoservice)</li>
+                <li>The dashboard / course overview (URL ends in <code>/my</code>)</li>
+                <li>Any course page (URL contains <code>/course</code>)</li>
+                <li>An activity page (e.g. <code>/mod/assign</code>)</li>
+                <li>The Moodle video service (URL contains <code>/videoservice</code>)</li>
               </ul>
             </li>
             <li>
-              Click on the Moodle Buddy+ logo
+              Click the Moodle Buddy+ icon
               <img class="title-icon" src="../../icons/48.png" />
-              in the extension bar
+              in the browser toolbar.
             </li>
-            <li>Explore all the features Moodle Buddy+ has to offer</li>
           </ol>
         </div>
 
-        <div class="section-title">Full Feature List</div>
+        <div class="section-title">Features</div>
         <div class="section-content">
-          <div class="screenshot-container">
-            <div>
-              <div class="center">Course Page UI</div>
-              <img src="../../screenshots/coursepage.png" width="300px" height="310px" />
-            </div>
-            <div>
-              <div class="center">Dashboard UI</div>
-              <img src="../../screenshots/dashboardpage.png" width="300px" height="310px" />
-            </div>
-          </div>
           <ul>
-            <div class="feature-section">Course Page</div>
-            <li>Download all course resources with one click</li>
-            <li>Scans single Moodle courses for new resources</li>
-            <li>
-              Scans single Moodle courses for new activities (Assignment Uploads, Forums, etc.)
-            </li>
-            <li>Shows you when new resources or activities have been detected</li>
-            <li>Download only new resources from a course</li>
-            <li>Filter downloadable resources for files and folders</li>
-            <li>Modify file names of the downloaded resources</li>
+            <div class="feature-section">Course page</div>
+            <li>One-click download of every resource in the course.</li>
+            <li>Detects new resources and activities (assignments, forums, …) since your last visit.</li>
+            <li>Download only what's new, or filter by files / folders.</li>
+            <li>Configurable folder structure and file-name format.</li>
+
             <div class="feature-section">Dashboard</div>
-            <li>Shows updates (resources &amp; activities) for all courses from the overview page</li>
-            <li>Download new resources directly from the overview page</li>
-            <li>
-              Scans your courses in the background (if you are logged in) and notifies you if there
-              are updates
-            </li>
-            <div class="feature-section">Assignment Pages</div>
-            <li>Download submitted files, graded or reviewed files, and comments</li>
-            <div class="feature-section">Video Pages</div>
-            <li>Download Moodle video service recordings</li>
-            <li>Download Zoom recordings embedded in Moodle</li>
+            <li>Scans every course on the overview page and surfaces updates per course.</li>
+            <li>Download a whole course (or just its new items) without leaving the dashboard.</li>
+            <li>Optional background scan that notifies you when courses change while you're logged in.</li>
+            <li>Group courses on disk by their dashboard category (FCL group).</li>
+            <li>When two courses share the same name in the same group, the registrar's course number is appended so each gets its own folder.</li>
+
+            <div class="feature-section">Resources</div>
+            <li>Folders are downloaded as a single zip per folder.</li>
+            <li>Moodle URL bookmarks are saved as <code>.txt</code> files containing the resolved external link.</li>
+
+            <div class="feature-section">Assignments &amp; videos</div>
+            <li>Download assignment submission files, graded files, and feedback comments.</li>
+            <li>Download Moodle video service recordings and embedded Zoom recordings.</li>
+
+            <div class="feature-section">Other</div>
+            <li>Supports the Moodle Tiles course format.</li>
           </ul>
         </div>
 
         <div class="section-title">Settings</div>
         <div class="section-content">
           <p class="center">
-            Moodle Buddy+ has options which you can configure
-            <span class="link options-link">here.</span>
+            Configure folder layout, file-name format, concurrency, custom selectors and more
+            <span class="link options-link">in the options page.</span>
           </p>
         </div>
 
-        <div id="contact" class="section-title">Feedback &amp; Contact</div>
+        <div id="contact" class="section-title">Feedback &amp; contact</div>
         <div class="section-content">
           <p>
             Open an
@@ -93,82 +83,65 @@
               class="link"
               target="_blank"
               rel="noopener noreferrer"
-              href="https://github.com/yarden-carmi/moodle-buddy/issues"
+              href="https://github.com/yarden-carmi/moodle-buddy-plus/issues"
             >issue on GitHub</a>
-            or send an email to
+            or email
             <a class="link" href="mailto:extensions@yardencarmi.com">extensions@yardencarmi.com</a>.
-          </p>
-          <p>
-            If the plugin does not work on your Moodle platform, please include your Moodle URL so
-            I can investigate.
+            If a feature breaks on your Moodle, please include the URL of the page where you saw the problem.
           </p>
         </div>
 
-        <div id="faq" class="section-title">FAQ / Troubleshoot</div>
+        <div id="faq" class="section-title">FAQ</div>
         <div class="section-content">
+          <p><b>Where do downloads end up?</b></p>
           <p>
-            <b>
-              The downloaded files are
-              <i>.php</i>
-              files and I can't open them. What is going on?
-            </b>
-          </p>
-          <p>
-            This usually occurs when a resource is pointing to a website. Please make sure that you
-            can open the resource manually and it doesn't redirect you to another website. If this
-            issue still occurs, please
-            <a class="link" href="#contact">contact me</a>.
+            Inside your browser's default download directory. The folder layout (per-course,
+            per-section, grouped, "Moodle/" wrapper, …) is controlled in the
+            <span class="link options-link">options.</span>
           </p>
 
+          <p><b>Two of my courses have the same name. Will the files mix?</b></p>
           <p>
-            <b>Where are my files stored?</b>
-          </p>
-          <p>
-            Files will always be downloaded to the default download directory of your browser.
-            Depending on the
-            <span class="link options-link">download settings</span>,
-            the files will either be inside a folder with the same name as the course name
-            (default), a special "Moodle" folder or directly in the download directory.
+            No. When Moodle Buddy+ sees two courses with the same name in the same group, it
+            appends each course's registrar number (e.g. <code>Course Name (868320308)</code>) to
+            the folder name so they stay separate.
           </p>
 
+          <p><b>A Moodle "URL" resource — what gets downloaded?</b></p>
           <p>
-            <b>Can I limit the maximum amount of concurrent downloads?</b>
-          </p>
-          <p>
-            Yes! You can configure this in the
-            <span class="link options-link">settings.</span>
+            A small <code>.txt</code> file containing the external link the URL activity points
+            to. The extension does not try to scrape arbitrary external sites.
           </p>
 
+          <p><b>Resources keep showing up as "new" even though they aren't.</b></p>
           <p>
-            <b>Random resources are being shown as new although they aren't. What is going on?</b>
-          </p>
-          <p>
-            Please clear the stored course data in the
-            <span class="link options-link">settings.</span>
-            This should hopefully fix it. If this issue still occurs, please
-            <a class="link" href="#contact">contact me</a>.
+            Clear the stored course data from the
+            <span class="link options-link">options.</span>
+            If it persists, please <a class="link" href="#contact">get in touch</a>.
           </p>
 
+          <p><b>Can I limit concurrent downloads?</b></p>
           <p>
-            <b>There are too many courses in my dashboard and the scanning fails. What can I do?</b>
-          </p>
-          <p>
-            You can either customize your Moodle dashboard to limit how many courses are displayed
-            or configure the maximum amount of scanned courses in the
-            <span class="link options-link">settings.</span>
+            Yes — set the maximum in the
+            <span class="link options-link">options.</span>
           </p>
 
+          <p><b>My dashboard has a lot of courses and the scan times out.</b></p>
           <p>
-            <b>Is Moodle Buddy+ open-source?</b>
+            Reduce the number of courses shown on the dashboard, or cap the maximum scanned
+            courses in the
+            <span class="link options-link">options.</span>
           </p>
+
+          <p><b>Is Moodle Buddy+ open source?</b></p>
           <p>
-            Yes! You can find the source code
+            Yes — the source is on
             <a
               class="link"
               target="_blank"
               rel="noopener noreferrer"
-              href="https://github.com/yarden-carmi/moodle-buddy"
-            >here.</a>
+              href="https://github.com/yarden-carmi/moodle-buddy-plus"
+            >GitHub.</a>
           </p>
         </div>
 
@@ -180,22 +153,20 @@
           </p>
         </div>
 
-        <div class="section-title">Privacy Policy</div>
+        <div class="section-title">Privacy policy</div>
         <div class="section-content">
           <p>
-            I do not have access to any login data.
+            No login data is ever read or transmitted.
             <br />
-            The resources are ONLY downloaded to YOUR computer.
+            Resources are downloaded straight to your computer; nothing is uploaded anywhere.
             <br />
-            I do NOT collect the downloaded resources in any way or form.
+            No analytics, telemetry, or usage data are collected.
           </p>
-          <p>No usage data or analytics are collected.</p>
         </div>
       </div>
 
       <div class="footer">
         <div class="footer-row">
-          <a class="link" href="#legal">Imprint &amp; Privacy</a>
           <span class="footer-right">
             Moodle Buddy+ — open-source browser extension
             <span id="version"></span>

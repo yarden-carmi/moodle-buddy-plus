@@ -23,6 +23,7 @@ export interface ExecuteScriptMessage extends Message {
 export interface DashboardDownloadCourseMessage extends Message {
   command: typeof COMMANDS.DASHBOARD_DOWNLOAD_NEW | typeof COMMANDS.DASHBOARD_DOWNLOAD_COURSE
   link: string
+  includeSeen?: boolean
 }
 
 type CrawlOptions = Pick<
@@ -45,6 +46,8 @@ export interface ScanInProgressMessage extends Message {
   command: typeof COMMANDS.SCAN_IN_PROGRESS
   completed: number
   total: number
+  collapsedCompleted?: number
+  collapsedTotal?: number
 }
 
 export interface ScanResultMessage extends Message {
@@ -64,6 +67,8 @@ export interface DashboardCourseData extends CourseScanData {
   name: string
   link: string
   isNew: boolean
+  isCollapsed?: boolean
+  group?: string
 }
 
 export interface DashboardScanResultMessage extends ScanResultMessage {
@@ -103,6 +108,7 @@ export interface DownloadMessage extends Message {
   courseLink: string
   courseName: string
   courseShortcut: string
+  courseGroup?: string
   resources: Resource[]
   options: CrawlOptions
 }

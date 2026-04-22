@@ -59,10 +59,13 @@ export async function sendRuntimeMessageSafely(message: unknown): Promise<void> 
 }
 
 export function sanitizeFileName(fileName: string, connectingString = ""): string {
-  return sanitize(
-    fileName.replace(/( )\1+/gi, " "), // Remove > 1 white spaces
-    { replacement: connectingString }
-  )
+  // Strip Unicode bidi/directional marks and zero-width chars that Chrome rejects
+  // as "Invalid filename" even though sanitize-filename allows them.
+  const stripped = fileName
+    .replace(/[​-\u200F\u202A-\u202E\u2066-\u2069﻿]/g, "")
+    .replace(/( )\1+/gi, " ") // Collapse consecutive whitespace
+    .trim()
+  return sanitize(stripped, { replacement: connectingString })
 }
 
 export function getFileTypeFromURL(url: string): string {

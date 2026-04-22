@@ -20,6 +20,6 @@ test/**
 website/*
 .claude/settings.local.json
 logo.psd
-extension/moodle-buddy-firefox.zip
-extension/moodle-buddy-chrome.zip
-extension/moodle-buddy-code.zip
+extension/moodle-buddy-plus-firefox.zip
+extension/moodle-buddy-plus-chrome.zip
+extension/moodle-buddy-plus-code.zip

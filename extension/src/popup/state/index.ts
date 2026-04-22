@@ -11,10 +11,16 @@ export const courseData = ref<StoredCourseData>()
 export const currentSelectionTab = ref<SelectionTab>()
 export const onlyNewResources = ref(false)
 
-export function updateState() {
-  if (activeTab.value?.id) {
-    chrome.tabs.sendMessage(activeTab.value.id, {
+// Returns true if the message reached a content script, false if the active
+// tab has no listener (e.g. on a non-Moodle page).
+export async function updateState(): Promise<boolean> {
+  if (!activeTab.value?.id) return false
+  try {
+    await chrome.tabs.sendMessage(activeTab.value.id, {
       command: COMMANDS.GET_STATE,
     } satisfies Message)
+    return true
+  } catch {
+    return false
   }
 }

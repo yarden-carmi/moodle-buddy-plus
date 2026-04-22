@@ -52,6 +52,11 @@ export function parseCourseShortcut(document: Document, options: ExtensionOption
   return "Unknown Shortcut"
 }
 
+export function parseCourseNumberFromCoursePage(document: Document): string {
+  const h = document.querySelector<HTMLElement>(".page-header-headings h1[title]")
+  return h?.getAttribute("title")?.trim() ?? ""
+}
+
 export function parseCourseNameFromCoursePage(
   document: Document,
   options: ExtensionOptions
@@ -117,6 +122,64 @@ export function parseCourseNameFromCoursePage(
   }
 
   return "Unknown Course"
+}
+
+export function parseCourseGroupFromCoursePage(document: Document, courseLink: string): string {
+  const idMatch = courseLink.match(/[?&]id=(\d+)/)
+  if (!idMatch) return ""
+  const courseId = idMatch[1]
+
+  const panels = document.querySelectorAll<HTMLElement>(
+    ".block_filtered_course_list .block-fcl__list"
+  )
+  for (const panel of Array.from(panels)) {
+    const hasSelfLink = Array.from(panel.querySelectorAll<HTMLAnchorElement>("a")).some((a) => {
+      const m = a.getAttribute("href")?.match(/[?&]id=(\d+)/)
+      return m?.[1] === courseId
+    })
+    if (!hasSelfLink) continue
+
+    const tabId = panel.getAttribute("aria-labelledby")
+    if (tabId) {
+      const label = document.getElementById(tabId)?.textContent?.trim()
+      if (label) return label
+    }
+  }
+  return ""
+}
+
+// True if the FCL panel containing this course has another course with the
+// same display name (used to disambiguate folder names when downloading from
+// a single course page, where peer-course context is not otherwise available).
+export function hasSiblingCourseWithSameName(
+  document: Document,
+  courseLink: string,
+  courseName: string
+): boolean {
+  if (!courseName) return false
+  const idMatch = courseLink.match(/[?&]id=(\d+)/)
+  if (!idMatch) return false
+  const myId = idMatch[1]
+
+  const panels = document.querySelectorAll<HTMLElement>(
+    ".block_filtered_course_list .block-fcl__list"
+  )
+  for (const panel of Array.from(panels)) {
+    const anchors = Array.from(
+      panel.querySelectorAll<HTMLAnchorElement>("a[href*='view.php?id=']")
+    )
+    if (!anchors.some((a) => a.getAttribute("href")?.includes(`id=${myId}`))) continue
+
+    return anchors.some((a) => {
+      const m = a.getAttribute("href")?.match(/[?&]id=(\d+)/)
+      if (!m || m[1] === myId) return false
+      const clone = a.cloneNode(true) as HTMLElement
+      clone.querySelectorAll(".sr-only, [data-region='icon']").forEach((el) => el.remove())
+      const label = (clone.textContent ?? "").trim()
+      return label.startsWith(courseName)
+    })
+  }
+  return false
 }
 
 export function parseCourseLink(htmlString: string): string {
@@ -300,6 +363,26 @@ export function parseFileNameFromNode(node: HTMLElement): string {
   return "Unknown Filename"
 }
 
+export function parseFolderRelativePathFromPluginFileURL(url: string): string {
+  // Moodle folder module pluginfile URLs look like:
+  //   .../pluginfile.php/{contextid}/mod_folder/content/{revision}/{relative_path}
+  // The relative path may include subfolder segments. Return them as "sub1/sub2/file.pdf"
+  // (decoded). Returns "" if the URL is not a mod_folder pluginfile URL.
+  const marker = "/mod_folder/content/"
+  const idx = url.indexOf(marker)
+  if (idx === -1) return ""
+  const afterMarker = url.slice(idx + marker.length).split(/[#?]/)[0]
+  const segments = afterMarker.split("/")
+  // Drop the revision segment (first)
+  segments.shift()
+  if (segments.length === 0) return ""
+  try {
+    return segments.map((s) => decodeURIComponent(s)).join("/")
+  } catch {
+    return segments.join("/")
+  }
+}
+
 export function parseFileNameFromPluginFileURL(url: string): string {
   let fileName = ""
   const urlParts = url.split("/")
@@ -379,6 +462,39 @@ export function parseActivityTypeFromNode(node: HTMLElement): string {
   return "Unkown Activity Type"
 }
 
+function readSectionLabel(
+  section: Element,
+  document: Document,
+  options: ExtensionOptions
+): string {
+  if (options.customSelectorSectionName) {
+    const customSelectorResult = section.querySelector(options.customSelectorSectionName)
+    const textContent = customSelectorResult?.textContent?.trim()
+    if (textContent) return textContent
+  }
+
+  const ariaLabel = section.attributes.getNamedItem("aria-label")?.value?.trim()
+  if (ariaLabel) return ariaLabel
+
+  const ariaLabelledBy = section.attributes.getNamedItem("aria-labelledby")
+  if (ariaLabelledBy) {
+    const label = document.getElementById(ariaLabelledBy.value)
+    const textContent = label?.textContent?.trim()
+    if (textContent) return textContent
+  }
+
+  const sectionNameElement = section.querySelector(".sectionname")
+  const sectionNameText = sectionNameElement?.textContent?.trim()
+  if (sectionNameText) return sectionNameText
+
+  const tileText = section.querySelector("h3")?.textContent?.trim()
+  if (tileText) return tileText
+
+  if (section.id === "section-0") return ""
+
+  return "Unknown Section"
+}
+
 export function parseSectionName(
   node: HTMLElement,
   document: Document,
@@ -390,51 +506,19 @@ export function parseSectionName(
     return ""
   }
 
-  if (options.customSelectorSectionName) {
-    const customSelectorResult = section.querySelector(options.customSelectorSectionName)
-    if (customSelectorResult) {
-      const textContent = customSelectorResult?.textContent?.trim()
-      if (textContent) {
-        return textContent
-      }
-    }
+  // Walk up through nested Moodle subsections, collecting ancestor section labels
+  const labels: string[] = []
+  let current: Element | null = section
+  while (current) {
+    const label = readSectionLabel(current, document, options)
+    if (label) labels.unshift(label)
+    current = current.parentElement?.closest(sectionSelector) ?? null
+  }
+  if (labels.length > 0) {
+    return labels.join("{slash}")
   }
 
-  const ariaLabel = section.attributes.getNamedItem("aria-label")?.value?.trim()
-  if (ariaLabel) {
-    return ariaLabel
-  }
-
-  const ariaLabelledBy = section.attributes.getNamedItem("aria-labelledby")
-  if (ariaLabelledBy) {
-    const label = document.getElementById(ariaLabelledBy.value)
-    if (label) {
-      const textContent = label?.textContent?.trim()
-      if (textContent) {
-        return textContent
-      }
-    }
-  }
-
-  const sectionNameElement = section.querySelector(".sectionname")
-  if (sectionNameElement) {
-    const textContent = sectionNameElement?.textContent?.trim()
-    if (textContent) {
-      return textContent
-    }
-  }
-
-  // Tiles format section title
-  const tileText = section.querySelector("h3")?.textContent?.trim()
-  if (tileText) return tileText
-
-  if (section.id === "section-0") {
-    // Make an exception for section 0
-    // Often courses contain general info in there without a section title
-    return ""
-  }
-
-  return "Unknown Section"
+  return readSectionLabel(section, document, options) || "Unknown Section"
 }
 
 export function getDownloadButton(node: HTMLElement): HTMLFormElement | null {

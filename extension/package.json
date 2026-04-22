@@ -1,8 +1,8 @@
 {
-  "name": "moodle-buddy",
-  "version": "1.6",
+  "name": "moodle-buddy-plus",
+  "version": "1.7",
   "displayName": "Moodle Buddy+",
-  "description": "Moodle Buddy offers mass file download and notification functionality for the moodle learning management platform.",
+  "description": "Moodle Buddy+ offers mass file download and notification functionality for the moodle learning management platform.",
   "author": "Marcel Reppenhagen",
   "main": "manifest.json",
   "license": "AGPL-3.0",
@@ -33,10 +33,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yarden-carmi/moodle-buddy.git"
+    "url": "git+https://github.com/yarden-carmi/moodle-buddy-plus.git"
   },
   "bugs": {
-    "url": "https://github.com/yarden-carmi/moodle-buddy/issues"
+    "url": "https://github.com/yarden-carmi/moodle-buddy-plus/issues"
   },
   "dependencies": {
     "@heroicons/vue": "^2.1.3",

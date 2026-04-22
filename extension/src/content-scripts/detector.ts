@@ -37,6 +37,10 @@ export function getSupportedPage(): SupportedPage | undefined {
   const isDashboardPage = Boolean(location.href.match(dashboardPageRegex))
   if (isDashboardPage) return "dashboard"
 
+  const homePageRegex = getURLRegex("home")
+  const isHomePage = Boolean(location.href.match(homePageRegex))
+  if (isHomePage) return "dashboard"
+
   const coursePageRegex = getURLRegex("course")
   const courseResourcesPageRegex = getURLRegex("courseResources")
   const isCoursePage = Boolean(
