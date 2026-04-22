@@ -13,18 +13,18 @@ if [ "$EXT_VERSION" == "$LATEST_TAG" ]; then
 fi
 
 # Check if extension was built
-if [ ! -f "moodle-buddy-firefox.zip" ]; then
-  echo "moodle-buddy-firefox.zip does not exist."
+if [ ! -f "moodle-buddy-plus-firefox.zip" ]; then
+  echo "moodle-buddy-plus-firefox.zip does not exist."
   exit
 fi
-if [ ! -f "moodle-buddy-chrome.zip" ]; then
-  echo "moodle-buddy-chrome.zip does not exist."
+if [ ! -f "moodle-buddy-plus-chrome.zip" ]; then
+  echo "moodle-buddy-plus-chrome.zip does not exist."
   exit
 fi
 
 mkdir tmp
-cp moodle-buddy-firefox.zip "tmp/moodle-buddy-firefox-$EXT_VERSION.zip"
-cp moodle-buddy-chrome.zip "tmp/moodle-buddy-chrome-$EXT_VERSION.zip"
+cp moodle-buddy-plus-firefox.zip "tmp/moodle-buddy-firefox-$EXT_VERSION.zip"
+cp moodle-buddy-plus-chrome.zip "tmp/moodle-buddy-chrome-$EXT_VERSION.zip"
 
 RELEASE_NOTES_FILE="release-notes/$EXT_VERSION.md"
 if [ ! -f "$RELEASE_NOTES_FILE" ]; then

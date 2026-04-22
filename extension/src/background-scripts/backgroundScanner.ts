@@ -28,7 +28,7 @@ async function backgroundScan() {
     const res = await fetch(courseLink)
 
     if (res.url.match(getURLRegex("login"))) {
-      logger.debug("Moodle Buddy background scan error: Not logged in")
+      logger.debug("Moodle Buddy+ background scan error: Not logged in")
       return
     }
 

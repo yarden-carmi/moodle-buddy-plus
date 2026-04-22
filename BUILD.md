@@ -31,7 +31,7 @@ To create the zip yourself for comparison:
 
 ```bash
 cd extension/build
-find . -type f | zip "../../moodle-buddy-firefox.zip" -@
+find . -type f | zip "../../moodle-buddy-plus-firefox.zip" -@
 ```
 
 ## Notes

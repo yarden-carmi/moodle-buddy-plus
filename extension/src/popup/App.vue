@@ -5,7 +5,7 @@
       <div class="divider"></div>
     </template>
     <div class="flex items-center justify-center mb-2 text-lg">
-      Moodle Buddy
+      Moodle Buddy+
       <img class="w-5 h-5 ml-2" src="../icons/48.png" alt="logo" />
     </div>
 
@@ -79,11 +79,19 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
   showLoading.value = false
 })
 
-getActiveTab().then((tab) => {
+getActiveTab().then(async (tab) => {
   activeTab.value = tab
 
   if (activeTab.value?.id) {
-    updateState()
+    const reached = await updateState()
+    // No content script on this tab → show the "page not supported" view
+    // instead of spinning forever waiting for a STATE message that won't come.
+    if (!reached) {
+      page.value = undefined
+      showLoading.value = false
+    }
+  } else {
+    showLoading.value = false
   }
 })
 </script>

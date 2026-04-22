@@ -99,7 +99,6 @@ module.exports = {
         { from: "./src/popup/index.html", to: "./popup/index.html" },
         { from: "./src/pages", to: "./pages", globOptions: { ignore: ["**/*.ts"] } },
         { from: "./src/icons", to: "./icons" },
-        { from: "../screenshots", to: "./screenshots" },
       ],
     }),
     new Dotenv({
