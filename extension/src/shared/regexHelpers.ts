@@ -4,6 +4,7 @@ export const validURLRegex =
 type URLRegexType =
   | "login"
   | "dashboard"
+  | "home"
   | "course"
   | "courseResources"
   | "assignment"
@@ -16,6 +17,7 @@ type URLRegexType =
 
 const loginPageRegex = /\/login\/index.php/gi
 const dashboardPageRegex = /\/my/gi
+const homePageRegex = /\/(index\.php)?(?=\?|$)/gi
 const coursePageRegex = /\/course\/(view|section)\.php\?id=[0-9]*/gi
 const courseResourcesPageRegex = /\/course\/resources\.php\?id=[0-9]*/gi
 const assignmentPageRegex = /\/mod\/assign\/view\.php\?(?=[^#]*\bid=[0-9]+)[^#]*/gi
@@ -30,6 +32,7 @@ const activityRegex = /\/mod\/(?!resource|folder)[A-z]*\/.*\.php.*/gi
 const allRegexes: Record<URLRegexType, RegExp> = {
   login: loginPageRegex,
   dashboard: dashboardPageRegex,
+  home: homePageRegex,
   course: coursePageRegex,
   courseResources: courseResourcesPageRegex,
   assignment: assignmentPageRegex,

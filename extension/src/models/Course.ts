@@ -18,11 +18,12 @@ import logger from "@shared/logger"
 async function getLastModifiedHeader(href: string, options: ExtensionOptions) {
   if (!options.detectFileUpdates) return
 
-  const headResponse = await fetch(href, {
-    method: "HEAD",
-  })
-  const lastModified = headResponse.headers.get("last-modified")
-  return lastModified ?? undefined
+  try {
+    const headResponse = await fetch(href, { method: "HEAD" })
+    return headResponse.headers.get("last-modified") ?? undefined
+  } catch {
+    return undefined
+  }
 }
 
 const courseURLRegex = getURLRegex("course")

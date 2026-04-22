@@ -85,7 +85,10 @@
     </div>
 
     <div v-else class="mt-1 text-xs text-gray-600">
-      <div v-if="course.isNew">
+      <div v-if="course.isCollapsed">
+        Course tab not expanded — open the tab to see updates.
+      </div>
+      <div v-else-if="course.isNew">
         Scanned for the first time.
         <br />
         Updates will be shown on your next visit.

@@ -3,19 +3,31 @@
     <div v-if="courses === undefined" class="text-center">
       <div>Scanning courses for updates...</div>
       <progress-bar ref="progressBar" action="scan" :cancelable="false"></progress-bar>
+      <template v-if="collapsedTotal > 0">
+        <div class="mt-1 text-xs text-gray-400">Loading course names...</div>
+        <progress-bar ref="collapsedProgressBar" action="scan" :cancelable="false"></progress-bar>
+      </template>
     </div>
     <div v-else-if="courses.length === 0" class="text-center">
       <div>No courses found</div>
     </div>
     <template v-else>
       <div class="flex flex-col items-center px-2 overflow-y-auto w-full max-h-80 scrollbar">
-        <course-card
-          v-for="(course, i) in courses"
-          :key="course.link"
-          :course="course"
-          :download-state="downloadState[course.link]"
-          @mark-as-seen="sortCoursesByNewestResourcesAndActivities"
-        />
+        <template v-for="group in groupedCourses" :key="group.label ?? 'default'">
+          <div
+            v-if="group.label"
+            class="w-full text-xs font-semibold text-gray-400 mt-2 mb-0.5 px-1 border-b border-gray-200"
+          >
+            {{ group.label }}
+          </div>
+          <course-card
+            v-for="course in group.list"
+            :key="course.link"
+            :course="course"
+            :download-state="downloadState[course.link]"
+            @mark-as-seen="() => {}"
+          />
+        </template>
       </div>
       <button
         class="btn btn-xs btn-primary w-1/2 mt-3"
@@ -29,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from "vue"
+import { reactive, ref, computed } from "vue"
 import { getCourseDownloadId } from "@shared/helpers"
 import {
   DashboardCourseData,
@@ -46,25 +58,36 @@ import logger from "@shared/logger"
 import { COMMANDS } from "@shared/constants"
 
 const courses = ref<DashboardCourseData[]>()
+const collapsedTotal = ref(0)
 
 const progressBar = ref<InstanceType<typeof ProgressBar> | null>(null)
+const collapsedProgressBar = ref<InstanceType<typeof ProgressBar> | null>(null)
 
 const downloadAllInProgress = ref(false)
 let downloadState = reactive<Record<string, DownloadProgressMessage | undefined>>({})
 
-const sortCoursesByNewestResourcesAndActivities = () => {
-  const getTotalCourseUpdates = (course: DashboardCourseData) =>
-    [...course.resources, ...course.activities].filter((r) => r.isNew || r.isUpdated).length
-
-  courses.value?.sort((c1: DashboardCourseData, c2: DashboardCourseData) => {
-    const c1Updates = getTotalCourseUpdates(c1)
-    const c2Updates = getTotalCourseUpdates(c2)
-
-    if (c1Updates > c2Updates) return -1
-    if (c1Updates < c2Updates) return 1
-    return 0
-  })
+function updates(course: DashboardCourseData) {
+  return [...course.resources, ...course.activities].filter((r) => r.isNew || r.isUpdated).length
 }
+
+const groupedCourses = computed(() => {
+  if (!courses.value?.length) return []
+  const hasGroups = courses.value.some((c) => c.group)
+  if (!hasGroups) {
+    const sorted = [...courses.value].sort((a, b) => updates(b) - updates(a))
+    return [{ label: undefined, list: sorted }]
+  }
+  const map = new Map<string, DashboardCourseData[]>()
+  for (const c of courses.value) {
+    const key = c.group ?? ""
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(c)
+  }
+  return Array.from(map.entries()).map(([label, list]) => ({
+    label: label || undefined,
+    list: [...list].sort((a, b) => updates(b) - updates(a)),
+  }))
+})
 
 function isDownloadDone(course: DashboardCourseData) {
   return downloadState[course.link]?.isDone
@@ -81,7 +104,6 @@ async function onDownloadAll() {
     return
   }
 
-  // Initialize download state
   downloadAllInProgress.value = true
   Object.keys(downloadState).forEach((key) => {
     Object.assign(downloadState, { [key]: undefined })
@@ -101,7 +123,6 @@ async function onDownloadAll() {
     Object.assign(downloadState, { [course.link]: initialDownloadState })
   })
 
-  // Trigger download one by one
   for (const course of courses.value) {
     let courseDownloadState = downloadState[course.link]
     if (!courseDownloadState) {
@@ -131,12 +152,18 @@ async function onDownloadAll() {
 
 chrome.runtime.onMessage.addListener(async (message: Message) => {
   const { command } = message
+
   if (command === COMMANDS.SCAN_IN_PROGRESS) {
-    const { total, completed } = message as ScanInProgressMessage
+    const { total, completed, collapsedCompleted, collapsedTotal: ct } =
+      message as ScanInProgressMessage
     if (total !== 0) {
       progressBar.value?.setProgress(total, completed)
     } else {
       progressBar.value?.resetProgress()
+    }
+    if (ct !== undefined) {
+      collapsedTotal.value = ct
+      collapsedProgressBar.value?.setProgress(ct, collapsedCompleted ?? 0)
     }
     return
   }
@@ -144,11 +171,7 @@ chrome.runtime.onMessage.addListener(async (message: Message) => {
   if (command === COMMANDS.SCAN_RESULT) {
     const { courses: dashboardCourses } = message as DashboardScanResultMessage
     courses.value = dashboardCourses
-
-    if (courses.value.length === 0) {
-    }
-
-    sortCoursesByNewestResourcesAndActivities()
+    return
   }
 
   if (command === COMMANDS.DOWNLOAD_PROGRESS) {

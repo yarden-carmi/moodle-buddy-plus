@@ -45,6 +45,8 @@ export interface ScanInProgressMessage extends Message {
   command: typeof COMMANDS.SCAN_IN_PROGRESS
   completed: number
   total: number
+  collapsedCompleted?: number
+  collapsedTotal?: number
 }
 
 export interface ScanResultMessage extends Message {
@@ -64,6 +66,8 @@ export interface DashboardCourseData extends CourseScanData {
   name: string
   link: string
   isNew: boolean
+  isCollapsed?: boolean
+  group?: string
 }
 
 export interface DashboardScanResultMessage extends ScanResultMessage {
