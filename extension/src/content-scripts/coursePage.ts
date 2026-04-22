@@ -80,6 +80,7 @@ async function initCoursePage() {
         id: getCourseDownloadId(command, course),
         courseName: course.name,
         courseShortcut: course.shortcut,
+        courseGroup: course.group,
         courseLink: course.link,
         resources: selectedResources,
         options,

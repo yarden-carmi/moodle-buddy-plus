@@ -119,6 +119,30 @@ export function parseCourseNameFromCoursePage(
   return "Unknown Course"
 }
 
+export function parseCourseGroupFromCoursePage(document: Document, courseLink: string): string {
+  const idMatch = courseLink.match(/[?&]id=(\d+)/)
+  if (!idMatch) return ""
+  const courseId = idMatch[1]
+
+  const panels = document.querySelectorAll<HTMLElement>(
+    ".block_filtered_course_list .block-fcl__list"
+  )
+  for (const panel of Array.from(panels)) {
+    const hasSelfLink = Array.from(panel.querySelectorAll<HTMLAnchorElement>("a")).some((a) => {
+      const m = a.getAttribute("href")?.match(/[?&]id=(\d+)/)
+      return m?.[1] === courseId
+    })
+    if (!hasSelfLink) continue
+
+    const tabId = panel.getAttribute("aria-labelledby")
+    if (tabId) {
+      const label = document.getElementById(tabId)?.textContent?.trim()
+      if (label) return label
+    }
+  }
+  return ""
+}
+
 export function parseCourseLink(htmlString: string): string {
   const courseURLRegex = getURLRegex("course")
   const match = htmlString.match(courseURLRegex)

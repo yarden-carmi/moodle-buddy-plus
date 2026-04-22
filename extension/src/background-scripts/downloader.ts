@@ -115,6 +115,7 @@ class Downloader {
   courseLink: string
   courseName: string
   courseShortcut: string
+  courseGroup: string
   resources: Resource[]
   options: ExtensionOptions
 
@@ -139,6 +140,7 @@ class Downloader {
     courseLink: string,
     courseName: string,
     courseShortcut: string,
+    courseGroup: string,
     resources: Resource[],
     options: ExtensionOptions
   ) {
@@ -146,6 +148,7 @@ class Downloader {
     this.courseLink = courseLink
     this.courseName = courseName
     this.courseShortcut = courseShortcut
+    this.courseGroup = courseGroup
     this.resources = resources
     this.options = options
 
@@ -396,6 +399,13 @@ class Downloader {
         break
       default:
         break
+    }
+
+    if (this.options.groupSubfolder && this.courseGroup) {
+      const cleanGroup = sanitizeFileName(this.courseGroup)
+      if (cleanGroup !== "") {
+        filePath = `${cleanGroup}/${filePath}`
+      }
     }
 
     if (this.options.saveToMoodleFolder) {
@@ -844,7 +854,7 @@ async function onCancel() {
 }
 
 async function onDownload(message: DownloadMessage) {
-  const { id, courseLink, courseName, courseShortcut, resources, options: userOptions } = message
+  const { id, courseLink, courseName, courseShortcut, courseGroup, resources, options: userOptions } = message
   logger.debug(`Received download message with id ${id}`)
 
   if (downloaders[id]) {
@@ -858,7 +868,7 @@ async function onDownload(message: DownloadMessage) {
   const options = { ...storageOptions, ...userOptions }
 
   // Create and register the downloader
-  const downloader = new Downloader(id, courseLink, courseName, courseShortcut, resources, options)
+  const downloader = new Downloader(id, courseLink, courseName, courseShortcut, courseGroup ?? "", resources, options)
   downloaders[downloader.id] = downloader
 }
 

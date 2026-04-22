@@ -107,6 +107,7 @@ export interface DownloadMessage extends Message {
   courseLink: string
   courseName: string
   courseShortcut: string
+  courseGroup?: string
   resources: Resource[]
   options: CrawlOptions
 }

@@ -34,6 +34,7 @@ class Course {
   HTMLDocument: Document
   name: string
   shortcut: string
+  group: string
   isFirstScan: boolean
   isCoursePage: boolean
   options: ExtensionOptions
@@ -54,6 +55,7 @@ class Course {
     this.options = options
     this.name = parser.parseCourseNameFromCoursePage(HTMLDocument, options)
     this.shortcut = parser.parseCourseShortcut(HTMLDocument, options)
+    this.group = parser.parseCourseGroupFromCoursePage(HTMLDocument, link)
     this.isFirstScan = true
     this.isCoursePage = !!link.match(courseURLRegex)
 

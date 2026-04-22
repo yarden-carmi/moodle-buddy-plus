@@ -18,6 +18,7 @@ const defaultExtensionOptions: ExtensionOptions = {
   downloadFolderAsZip: false,
   includeAssignmentSubmissionFiles: true,
   saveToMoodleFolder: true,
+  groupSubfolder: true,
   folderStructure: "CourseSectionFile",
   includeVideo: true,
   includeAudio: true,
